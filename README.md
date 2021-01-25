@@ -1,2 +1,2 @@
-# lalrpop-proc-macro
+# parser-proc-macro
 Inspired by LALRPOP, a proc-macro based parser generator

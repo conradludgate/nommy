@@ -1,5 +1,4 @@
 use crate::{Parse, Process};
-use std::iter::Peekable;
 
 macro_rules! Tuple {
     ($error:ident: $($T:ident),*) => {
@@ -13,15 +12,13 @@ pub enum $error<$($T),*> {
 
 impl<$($T),*> Parse for ($($T),*) where $($T: Parse),* {
     type Error = $error<$($T::Error),*>;
-    fn parse(input: &mut Peekable<impl Iterator<Item=char>>) -> Result<Self, Self::Error> {
-        Ok((
-            $(
-                match $T::parse(input) {
-                    Ok(t) => t,
-                    Err(e) => return Err($error::$T(e)),
-                },
-            )*
-        ))
+    #[allow(non_snake_case)]
+    fn parse(input: &str) -> Result<(Self, &str), Self::Error> {
+        $(
+            let ($T, input) = $T::parse(input).map_err(|e| $error::$T(e))?;
+        )*
+
+        Ok((($($T),*), input))
     }
 }
 
@@ -64,28 +61,23 @@ mod tests {
 
     #[test]
     fn test_parse_matches_pairs() {
-        let mut input = "(){}[]<>".chars().peekable();
-        assert_eq!(<(LParen, RParen)>::parse(&mut input), Ok((LParen, RParen)));
-        assert_eq!(<(LBrace, RBrace)>::parse(&mut input), Ok((LBrace, RBrace)));
-        assert_eq!(<(LBracket, RBracket)>::parse(&mut input), Ok((LBracket, RBracket)));
-        assert_eq!(<(LThan, GThan)>::parse(&mut input), Ok((LThan, GThan)));
-        assert_eq!(input.next(), None)
+        let input = "(){}[]<>";
+        let (_, input) = <(LParen, RParen)>::parse(input).unwrap();
+        let (_, input) = <(LBrace, RBrace)>::parse(input).unwrap();
+        let (_, input) = <(LBracket, RBracket)>::parse(input).unwrap();
+        let (_, input) = <(LThan, GThan)>::parse(input).unwrap();
+        assert_eq!(input, "");
     }
 
     #[test]
     fn test_parse_matches_oct() {
-        let mut input = "(){}[]<>".chars().peekable();
-        assert_eq!(<(
+        let input = "(){}[]<>";
+        let (_, input) = <(
             LParen, RParen,
             LBrace, RBrace,
             LBracket, RBracket,
             LThan, GThan,
-        )>::parse(&mut input), Ok((
-            LParen, RParen,
-            LBrace, RBrace,
-            LBracket, RBracket,
-            LThan, GThan,
-        )));
-        assert_eq!(input.next(), None)
+        )>::parse(input).unwrap();
+        assert_eq!(input, "")
     }
 }

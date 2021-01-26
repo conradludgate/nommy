@@ -1,12 +1,12 @@
-use std::iter::Peekable;
-
 pub mod token;
 pub mod tuple;
+pub use thiserror;
+pub use nommy_derive::Parse;
 
 pub trait Parse: Sized {
     type Error;
 
-    fn parse(input: &mut Peekable<impl Iterator<Item=char>>) -> Result<Self, Self::Error>;
+    fn parse(input: &str) -> Result<(Self, &str), Self::Error>;
 }
 
 pub trait Process {
@@ -14,4 +14,3 @@ pub trait Process {
 
     fn process(self) -> Self::Output;
 }
-

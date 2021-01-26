@@ -1,0 +1,9 @@
+[package]
+name = "nommy"
+version = "0.1.0"
+authors = ["Conrad Ludgate <conradludgate@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+nommy_derive = { path = "../nommy-derive", version = "=0.1.0" }
+thiserror = "1.0"

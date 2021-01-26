@@ -1,7 +1,6 @@
-[package]
-name = "parser"
-version = "0.1.0"
-authors = ["Conrad Ludgate <conradludgate@gmail.com>"]
-edition = "2018"
-
-[dependencies]
+[workspace]
+members = [
+    "nommy",
+    "nommy-derive",
+    "nommy-tests",
+]

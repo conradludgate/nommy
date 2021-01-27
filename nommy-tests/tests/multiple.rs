@@ -21,8 +21,8 @@ fn main() {
     );
 
     let err = Multiple::parse(".").unwrap_err();
-    assert!(format!("{}", err).starts_with("could not parse field `left`:"));
+    assert_eq!(format!("{}", err), "could not parse field `left`: error parsing tag. expected: `(`, got: `.`");
 
     let err = Multiple::parse("(.").unwrap_err();
-    assert!(format!("{}", err).starts_with("could not parse field `right`:"));
+    assert_eq!(format!("{}", err), "could not parse field `right`: error parsing tag. expected: `)`, got: `.`");
 }

@@ -1,11 +1,14 @@
 use crate::{Parse, Process};
+use thiserror::Error;
+use std::error::Error;
 
 macro_rules! Tuple {
     ($error:ident: $($T:ident),*) => {
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum $error<$($T),*> {
+#[derive(Debug, Copy, Clone, PartialEq, Error)]
+pub enum $error<$($T),*> where $($T: Error),* {
     $(
+        #[error("could not parse tuple")]
         $T($T),
     )*
 }
@@ -38,26 +41,22 @@ impl<$($T),*> Process for ($($T),*) where $($T: Process),* {
 
     };
 }
-Tuple!(Error2: T1, T2);
-Tuple!(Error3: T1, T2, T3);
-Tuple!(Error4: T1, T2, T3, T4);
-Tuple!(Error5: T1, T2, T3, T4, T5);
-Tuple!(Error6: T1, T2, T3, T4, T5, T6);
-Tuple!(Error7: T1, T2, T3, T4, T5, T6, T7);
-Tuple!(Error8: T1, T2, T3, T4, T5, T6, T7, T8);
-Tuple!(Error9: T1, T2, T3, T4, T5, T6, T7, T8, T9);
-Tuple!(Error10: T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
-Tuple!(Error11: T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11);
-Tuple!(Error12: T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
-Tuple!(Error13: T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13);
-Tuple!(Error14: T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14);
-Tuple!(Error15: T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15);
-
+Tuple!(Tuple2ParseError: T1, T2);
+Tuple!(Tuple3ParseError: T1, T2, T3);
+Tuple!(Tuple4ParseError: T1, T2, T3, T4);
+Tuple!(Tuple5ParseError: T1, T2, T3, T4, T5);
+Tuple!(Tuple6ParseError: T1, T2, T3, T4, T5, T6);
+Tuple!(Tuple7ParseError: T1, T2, T3, T4, T5, T6, T7);
+Tuple!(Tuple8ParseError: T1, T2, T3, T4, T5, T6, T7, T8);
+Tuple!(Tuple9ParseError: T1, T2, T3, T4, T5, T6, T7, T8, T9);
+Tuple!(Tuple10ParseError: T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
+Tuple!(Tuple11ParseError: T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11);
+Tuple!(Tuple12ParseError: T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 
 #[cfg(test)]
 mod tests {
-    use crate::{Parse};
     use crate::token::*;
+    use crate::Parse;
 
     #[test]
     fn test_parse_matches_pairs() {
@@ -73,11 +72,16 @@ mod tests {
     fn test_parse_matches_oct() {
         let input = "(){}[]<>";
         let (_, input) = <(
-            LParen, RParen,
-            LBrace, RBrace,
-            LBracket, RBracket,
-            LThan, GThan,
-        )>::parse(input).unwrap();
+            LParen,
+            RParen,
+            LBrace,
+            RBrace,
+            LBracket,
+            RBracket,
+            LThan,
+            GThan,
+        )>::parse(input)
+        .unwrap();
         assert_eq!(input, "")
     }
 }

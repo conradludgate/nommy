@@ -1,11 +1,10 @@
 use proc_macro::TokenStream;
-use quote::{ToTokens};
+use quote::ToTokens;
 use syn::{parse_macro_input, DeriveInput};
 
 mod named_struct;
 mod util;
 use named_struct::NamedStruct;
-
 
 #[proc_macro_derive(Parse)]
 pub fn derive_parse(input: TokenStream) -> TokenStream {
@@ -13,9 +12,7 @@ pub fn derive_parse(input: TokenStream) -> TokenStream {
 
     match &input.data {
         syn::Data::Struct(s) => match &s.fields {
-            syn::Fields::Named(named) => {
-                NamedStruct::new(&input, named).into_token_stream()
-            }
+            syn::Fields::Named(named) => NamedStruct::new(&input, named).into_token_stream(),
             syn::Fields::Unnamed(fields) => {
                 eprintln!("struct unnamed fields: {:?}", fields.unnamed);
                 unimplemented!()
@@ -30,5 +27,6 @@ pub fn derive_parse(input: TokenStream) -> TokenStream {
             unimplemented!()
         }
         syn::Data::Union(_) => panic!("unions not supported"),
-    }.into()
+    }
+    .into()
 }

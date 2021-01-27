@@ -1,4 +1,7 @@
-use nommy::{token::LParen, Parse};
+use nommy::{
+    token::{LParen},
+    Parse,
+};
 
 #[derive(Debug, Parse, PartialEq)]
 struct Single {
@@ -11,5 +14,5 @@ fn main() {
     assert_eq!(output, Single { only: LParen });
 
     let err = Single::parse(".").unwrap_err();
-    assert!(format!("{}", err).starts_with("could not parse field `only`:"));
+    assert_eq!(format!("{}", err), "could not parse field `only`: error parsing tag. expected: `(`, got: `.`");
 }

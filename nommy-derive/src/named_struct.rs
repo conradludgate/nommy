@@ -90,11 +90,32 @@ impl ToTokens for ErrorRow {
             &name.to_string().to_camel_case(),
             proc_macro2::Span::call_site(),
         );
-        let error_message = format!("could not parse field `{}`: {{0:?}}", name.to_string());
 
         tokens.extend(quote! {
-            #[error(#error_message)]
-            #pascal_name(Box<<#ty as Parse>::Error>),
+            #pascal_name(Box<<#ty as ::nommy::Parse>::Error>),
+        })
+    }
+}
+
+struct ErrorDisplayRow {
+    pub error: syn::Ident,
+    pub field: NamedField,
+}
+
+impl ToTokens for ErrorDisplayRow {
+    fn to_tokens(&self, tokens: &mut TokenStream2) {
+        let ErrorDisplayRow { error, field } = self;
+        let name = &field.name;
+
+        let pascal_name = syn::Ident::new(
+            &name.to_string().to_camel_case(),
+            proc_macro2::Span::call_site(),
+        );
+
+        let error_message = format!("could not parse field `{}`: {{}}", name.to_string());
+
+        tokens.extend(quote! {
+            #error::#pascal_name(_0) => write!(__formatter, #error_message, _0),
         })
     }
 }
@@ -147,10 +168,15 @@ impl ToTokens for NamedStruct {
             }
         }
 
-        let error = format_ident!("{}Err", name);
+        let error = format_ident!("{}ParseError", name);
         let args = Args(args.clone());
 
         let error_rows = fields.iter().map(|field| ErrorRow {
+            field: field.clone(),
+        });
+
+        let error_display_rows = fields.iter().map(|field| ErrorDisplayRow {
+            error: error.clone(),
             field: field.clone(),
         });
 
@@ -162,11 +188,22 @@ impl ToTokens for NamedStruct {
         let field_names = fields.iter().map(|field| field.name.clone());
 
         tokens.extend(quote! {
-            #[derive(Debug, ::nommy::thiserror::Error)]
+            #[derive(Debug, PartialEq)]
             #vis enum #error #args #where_clause {
                 #( #error_rows )*
             }
+            #[automatically_derived]
+            impl ::std::error::Error for #error {}
+            #[automatically_derived]
+            impl ::std::fmt::Display for #error {
+                fn fmt(&self, __formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    match self {
+                        #( #error_display_rows )*
+                    }
+                }
+            }
 
+            #[automatically_derived]
             impl #args ::nommy::Parse for #name #args #where_clause {
                 type Error = #error #args;
                 fn parse(input: &str) -> ::std::result::Result<(Self, &str), Self::Error> {

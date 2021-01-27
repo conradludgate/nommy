@@ -1,5 +1,4 @@
 use std::fmt;
-use crate::{Buffer, Cursor, Parse, Peek, Process};
 
 #[derive(Debug, PartialEq)]
 pub struct TokenParseError {
@@ -14,33 +13,45 @@ impl fmt::Display for TokenParseError {
 }
 
 #[macro_export]
+/// Create a new Tag parse type.
+///
+/// ```
+/// use nommy::{parse, Tag};
+/// // Create a unit struct named `Struct` which parses the tag `struct`
+/// Tag!{Struct: "struct"}
+///
+/// // we can now call parse for our `Struct` type
+/// let _: Struct = parse("struct".chars()).unwrap();
+/// ```
 macro_rules! Tag {
-    ($($name:ident:$expected:literal,)*) => {
+    ($($name:ident: $expected:literal),*) => {
         $(
 
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct $name;
-impl Process for $name {
+impl $crate::Process for $name {
     type Output = Self;
     fn process(self) -> Self::Output {
         self
     }
 }
-impl Peek<char> for $name {
-    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
+
+impl $crate::Peek<char> for $name {
+    fn peek(input: &mut $crate::Cursor<impl Iterator<Item = char>>) -> bool {
         const EXPECTED: &'static str = $expected;
         EXPECTED.chars().eq(input.take(EXPECTED.len()))
     }
 }
-impl Parse<char> for $name {
-    type Error = TokenParseError;
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> Result<Self, Self::Error> {
+
+impl $crate::Parse<char> for $name {
+    type Error = $crate::token::TokenParseError;
+    fn parse(input: &mut $crate::Buffer<impl Iterator<Item = char>>) -> Result<Self, Self::Error> {
         const EXPECTED: &'static str = $expected;
         if EXPECTED.chars().eq(input.take(EXPECTED.len())) {
             Ok($name)
         } else {
-            Err(TokenParseError{expected: EXPECTED})
+            Err($crate::token::TokenParseError{expected: EXPECTED})
         }
     }
 }
@@ -58,13 +69,13 @@ Tag![
     RBracket: "]",
     LThan: "<",
     GThan: ">",
-    Dot: ".",
+    Dot: "."
 ];
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{parse, Parse};
+    use crate::{Buffer, Parse, parse};
 
     #[test]
     fn test_parse_matches() {

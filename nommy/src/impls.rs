@@ -1,30 +1,15 @@
-use crate::{Buffer, Cursor, Parse, Peek, Process};
-use std::{error::Error, fmt};
-
-#[derive(Debug)]
-pub struct NeverError;
-
-impl Error for NeverError {}
-impl fmt::Display for NeverError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "error should not have occured. This is probably a bug with nommy"
-        )
-    }
-}
+use crate::*;
+use std::convert::Infallible;
 
 impl<P: Peek<T>, T> Peek<T> for Option<P> {
     fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool {
         let mut cursor = input.cursor();
 
-        let skip = if P::peek(&mut cursor) {
-            cursor.close()
-        } else {
-            0
-        };
+        if P::peek(&mut cursor) {
+            let skip = cursor.close();
+            input.fast_forward(skip);
+        }
 
-        input.skip(skip);
         // Option should always return true for peek
         true
     }
@@ -34,7 +19,7 @@ impl<P: Peek<T>, T> Peek<T> for Option<P> {
 /// Result is None if parsing P fails
 /// Otherwise, result is Some(p)
 impl<P: Parse<T>, T> Parse<T> for Option<P> {
-    type Error = NeverError;
+    type Error = Infallible;
     fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
         if P::peek(&mut input.cursor()) {
             Ok(Some(
@@ -61,7 +46,7 @@ impl<P: Peek<T>, T> Peek<T> for Vec<P> {
                 break;
             }
             let skip = cursor.close();
-            input.skip(skip);
+            input.fast_forward(skip);
         }
         true
     }
@@ -71,7 +56,7 @@ impl<P: Peek<T>, T> Peek<T> for Vec<P> {
 /// Repeatedly attempt to parse P,
 /// Result is all successful attempts
 impl<P: Parse<T>, T> Parse<T> for Vec<P> {
-    type Error = NeverError;
+    type Error = Infallible;
     fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
         let mut output = vec![];
         while P::peek(&mut input.cursor()) {
@@ -123,7 +108,7 @@ impl<P: Peek<T>, T> Peek<T> for Vec1<P> {
                 break;
             }
             let skip = cursor.close();
-            input.skip(skip);
+            input.fast_forward(skip);
         }
 
         true
@@ -149,63 +134,6 @@ impl<P: Process> Process for Vec1<P> {
     type Output = Vec<P::Output>;
     fn process(self) -> Self::Output {
         self.0.into_iter().map(P::process).collect()
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct PrefixedBy<Prefix, P> {
-    pub prefix: Prefix,
-    pub parsed: P,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum PrefixedByParseError<PrefixParseError, ParseError>
-where
-    PrefixParseError: Error,
-    ParseError: Error,
-{
-    Prefix(Box<PrefixParseError>),
-    Parsed(Box<ParseError>),
-}
-
-impl<PrefixParseError: Error, ParseError: Error> Error
-    for PrefixedByParseError<PrefixParseError, ParseError>
-{
-}
-impl<PrefixParseError: Error, ParseError: Error> fmt::Display
-    for PrefixedByParseError<PrefixParseError, ParseError>
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self {
-            PrefixedByParseError::Prefix(e) => write!(f, "could not parse prefix: {}", e),
-            PrefixedByParseError::Parsed(e) => write!(f, "could not parse body: {}", e),
-        }
-    }
-}
-
-impl<Prefix: Peek<T>, P: Peek<T>, T> Peek<T> for PrefixedBy<Prefix, P> {
-    fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool {
-        Prefix::peek(input) && P::peek(input)
-    }
-}
-
-/// Define Parse for PrefixedBy<P>.
-/// Parse Prefix then parse P
-impl<Prefix: Parse<T>, P: Parse<T>, T> Parse<T> for PrefixedBy<Prefix, P> {
-    type Error = PrefixedByParseError<Prefix::Error, P::Error>;
-    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
-        Ok(PrefixedBy {
-            prefix: Prefix::parse(input)
-                .map_err(|err| PrefixedByParseError::Prefix(Box::new(err)))?,
-            parsed: P::parse(input).map_err(|err| PrefixedByParseError::Parsed(Box::new(err)))?,
-        })
-    }
-}
-
-impl<Prefix, P: Process> Process for PrefixedBy<Prefix, P> {
-    type Output = P::Output;
-    fn process(self) -> Self::Output {
-        self.parsed.process()
     }
 }
 

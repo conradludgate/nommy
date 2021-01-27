@@ -1,16 +1,29 @@
 use crate::{Buffer, Cursor, Parse, Peek, Process};
-use std::error::Error;
-use thiserror::Error;
+use std::{error::Error, fmt};
 
 macro_rules! Tuple {
     ($error:ident: $($T:ident),*) => {
 
-#[derive(Debug, Copy, Clone, PartialEq, Error)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum $error<$($T),*> where $($T: Error),* {
     $(
-        #[error("could not parse tuple")]
         $T($T),
     )*
+}
+
+impl<$($T: Error),*> Error for $error<$($T),*>  {}
+impl<$($T: Error),*>  fmt::Display for $error<$($T),*>  {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut i = 0;
+        $(
+            i += 1;
+            if let $error::$T(e) = &self {
+                return write!(f, "error parsing term {}: {}", i, e)
+            }
+        )*
+
+        unreachable!()
+    }
 }
 
 impl<T, $($T),*> Peek<T> for ($($T),*) where $($T: Peek<T>),* {
@@ -62,7 +75,7 @@ Tuple!(Tuple12ParseError: T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 
 #[cfg(test)]
 mod tests {
-    use crate::Parse;
+    use crate::{parse, Parse};
     use crate::{token::*, Buffer};
 
     #[test]
@@ -90,5 +103,27 @@ mod tests {
         )>::parse(&mut input)
         .unwrap();
         assert!(input.next().is_none());
+    }
+
+    #[test]
+    fn test_parse_matches_oct_error() {
+        let mut input = Buffer::new("(){.".chars());
+        let res: Result<
+            (
+                LParen,
+                RParen,
+                LBrace,
+                RBrace,
+                LBracket,
+                RBracket,
+                LThan,
+                GThan,
+            ),
+            _,
+        > = parse(&mut input);
+        assert_eq!(
+            format!("{}", res.unwrap_err()),
+            "error parsing term 4: error parsing tag `}`"
+        );
     }
 }

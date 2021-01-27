@@ -6,6 +6,7 @@ edition = "2018"
 description = "derive(Parse)"
 license = "MIT"
 repository = "https://github.com/conradludgate/nommy"
+readme = "../README.md"
 
 [lib]
 proc-macro = true

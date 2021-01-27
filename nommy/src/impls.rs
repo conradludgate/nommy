@@ -1,10 +1,18 @@
 use crate::{Buffer, Cursor, Parse, Peek, Process};
-use std::{error::Error, fmt::Debug};
-use thiserror::Error;
+use std::{error::Error, fmt};
 
-#[derive(Debug, Error)]
-#[error("error should not have occured. This is probably a bug with nommy")]
+#[derive(Debug)]
 pub struct NeverError;
+
+impl Error for NeverError {}
+impl fmt::Display for NeverError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "error should not have occured. This is probably a bug with nommy"
+        )
+    }
+}
 
 impl<P: Peek<T>, T> Peek<T> for Option<P> {
     fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool {
@@ -150,16 +158,29 @@ pub struct PrefixedBy<Prefix, P> {
     pub parsed: P,
 }
 
-#[derive(Debug, Clone, PartialEq, Error)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum PrefixedByParseError<PrefixParseError, ParseError>
 where
     PrefixParseError: Error,
     ParseError: Error,
 {
-    #[error("could not parse prefix: {0}")]
     Prefix(Box<PrefixParseError>),
-    #[error("could not parse body: {0}")]
     Parsed(Box<ParseError>),
+}
+
+impl<PrefixParseError: Error, ParseError: Error> Error
+    for PrefixedByParseError<PrefixParseError, ParseError>
+{
+}
+impl<PrefixParseError: Error, ParseError: Error> fmt::Display
+    for PrefixedByParseError<PrefixParseError, ParseError>
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self {
+            PrefixedByParseError::Prefix(e) => write!(f, "could not parse prefix: {}", e),
+            PrefixedByParseError::Parsed(e) => write!(f, "could not parse body: {}", e),
+        }
+    }
 }
 
 impl<Prefix: Peek<T>, P: Peek<T>, T> Peek<T> for PrefixedBy<Prefix, P> {

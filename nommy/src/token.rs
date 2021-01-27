@@ -1,34 +1,15 @@
+use std::fmt;
 use crate::{Buffer, Cursor, Parse, Peek, Process};
-use thiserror::Error;
-#[derive(Debug, PartialEq, Error)]
-#[error("error parsing tag `{expected}`")]
+
+#[derive(Debug, PartialEq)]
 pub struct TokenParseError {
     pub expected: &'static str,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Token;
-impl Process for Token {
-    type Output = Self;
-    fn process(self) -> Self::Output {
-        self
-    }
-}
-impl Peek<char> for Token {
-    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
-        const EXPECTED: &'static str = "foo";
-        EXPECTED.chars().eq(input.take(EXPECTED.len()))
-    }
-}
-impl Parse<char> for Token {
-    type Error = TokenParseError;
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> Result<Self, Self::Error> {
-        const EXPECTED: &'static str = "foo";
-        if EXPECTED.chars().eq(input.take(EXPECTED.len())) {
-            Ok(Token)
-        } else {
-            Err(TokenParseError { expected: EXPECTED })
-        }
+impl std::error::Error for TokenParseError {}
+impl fmt::Display for TokenParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "error parsing tag `{}`", self.expected)
     }
 }
 

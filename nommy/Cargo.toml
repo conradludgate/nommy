@@ -3,6 +3,9 @@ name = "nommy"
 version = "0.1.0"
 authors = ["Conrad Ludgate <conradludgate@gmail.com>"]
 edition = "2018"
+description = "Type based parser"
+license = "MIT"
+repository = "https://github.com/conradludgate/nommy"
 
 [dependencies]
 nommy_derive = { path = "../nommy-derive", version = "=0.1.0" }

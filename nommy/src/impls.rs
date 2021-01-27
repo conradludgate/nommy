@@ -1,20 +1,39 @@
+use crate::{Buffer, Cursor, Parse, Peek, Process};
 use std::{error::Error, fmt::Debug};
 use thiserror::Error;
-use crate::{Parse, Process};
 
 #[derive(Debug, Error)]
 #[error("error should not have occured. This is probably a bug with nommy")]
 pub struct NeverError;
 
+impl<P: Peek<T>, T> Peek<T> for Option<P> {
+    fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool {
+        let mut cursor = input.cursor();
+
+        let skip = if P::peek(&mut cursor) {
+            cursor.close()
+        } else {
+            0
+        };
+
+        input.skip(skip);
+        // Option should always return true for peek
+        true
+    }
+}
+
 /// Define Parse for Option<P>.
 /// Result is None if parsing P fails
 /// Otherwise, result is Some(p)
-impl<P: Parse> Parse for Option<P> {
+impl<P: Parse<T>, T> Parse<T> for Option<P> {
     type Error = NeverError;
-    fn parse(input: &str) -> Result<(Self, &str), Self::Error> {
-        match P::parse(input) {
-            Ok((p, input)) => Ok((Some(p), input)),
-            _ => Ok((None, input)),
+    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
+        if P::peek(&mut input.cursor()) {
+            Ok(Some(
+                P::parse(input).expect("peek succeeded but parse failed"),
+            ))
+        } else {
+            Ok(None)
         }
     }
 }
@@ -26,23 +45,32 @@ impl<P: Process> Process for Option<P> {
     }
 }
 
+impl<P: Peek<T>, T> Peek<T> for Vec<P> {
+    fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool {
+        loop {
+            let mut cursor = input.cursor();
+            if !P::peek(&mut cursor) {
+                break;
+            }
+            let skip = cursor.close();
+            input.skip(skip);
+        }
+        true
+    }
+}
+
 /// Define Parse for Vec<P>.
 /// Repeatedly attempt to parse P,
 /// Result is all successful attempts
-impl<P: Parse> Parse for Vec<P> {
+impl<P: Parse<T>, T> Parse<T> for Vec<P> {
     type Error = NeverError;
-    fn parse(mut input: &str) -> Result<(Self, &str), Self::Error> {
+    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
         let mut output = vec![];
-        loop {
-            match P::parse(input) {
-                Ok((p, next)) => {
-                    input = next;
-                    output.push(p);
-                }
-                _ => break,
-            }
+        while P::peek(&mut input.cursor()) {
+            output.push(P::parse(input).expect("peek succeeded but parse failed"));
         }
-        Ok((output, input))
+
+        Ok(output)
     }
 }
 
@@ -75,25 +103,37 @@ impl<P> Vec1<P> {
     }
 }
 
+impl<P: Peek<T>, T> Peek<T> for Vec1<P> {
+    fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool {
+        if !P::peek(input) {
+            return false;
+        }
+
+        loop {
+            let mut cursor = input.cursor();
+            if !P::peek(&mut cursor) {
+                break;
+            }
+            let skip = cursor.close();
+            input.skip(skip);
+        }
+
+        true
+    }
+}
+
 /// Define Parse for Vec1<P>.
 /// Repeatedly attempt to parse P,
 /// Result is all successful attempts
-impl<P: Parse> Parse for Vec1<P> {
+impl<P: Parse<T>, T> Parse<T> for Vec1<P> {
     type Error = P::Error;
-    fn parse(input: &str) -> Result<(Self, &str), Self::Error> {
-        let (first, mut input) = P::parse(input)?;
-
-        let mut output = vec![first];
-        loop {
-            match P::parse(input) {
-                Ok((p, next)) => {
-                    input = next;
-                    output.push(p);
-                }
-                _ => break,
-            }
+    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
+        let mut output = vec![P::parse(input)?];
+        while P::peek(&mut input.cursor()) {
+            output.push(P::parse(input).expect("peek succeeded but parse failed"));
         }
-        Ok((Vec1(output), input))
+
+        Ok(Vec1(output))
     }
 }
 
@@ -122,16 +162,22 @@ where
     Parsed(Box<ParseError>),
 }
 
+impl<Prefix: Peek<T>, P: Peek<T>, T> Peek<T> for PrefixedBy<Prefix, P> {
+    fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool {
+        Prefix::peek(input) && P::peek(input)
+    }
+}
+
 /// Define Parse for PrefixedBy<P>.
 /// Parse Prefix then parse P
-impl<Prefix: Parse, P: Parse> Parse for PrefixedBy<Prefix, P> {
+impl<Prefix: Parse<T>, P: Parse<T>, T> Parse<T> for PrefixedBy<Prefix, P> {
     type Error = PrefixedByParseError<Prefix::Error, P::Error>;
-    fn parse(input: &str) -> Result<(Self, &str), Self::Error> {
-        let (prefix, input) =
-            Prefix::parse(input).map_err(|err| PrefixedByParseError::Prefix(Box::new(err)))?;
-        let (parsed, input) =
-            P::parse(input).map_err(|err| PrefixedByParseError::Parsed(Box::new(err)))?;
-        Ok((PrefixedBy { prefix, parsed }, input))
+    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
+        Ok(PrefixedBy {
+            prefix: Prefix::parse(input)
+                .map_err(|err| PrefixedByParseError::Prefix(Box::new(err)))?,
+            parsed: P::parse(input).map_err(|err| PrefixedByParseError::Parsed(Box::new(err)))?,
+        })
     }
 }
 
@@ -144,49 +190,43 @@ impl<Prefix, P: Process> Process for PrefixedBy<Prefix, P> {
 
 #[cfg(test)]
 mod tests {
-    use crate::token::*;
-    use crate::Parse;
+    use crate::{parse, token::*};
 
     use super::Vec1;
 
     #[test]
     fn option() {
-        let (output, input) = Option::<Dot>::parse(".").unwrap();
-        assert_eq!(input, "");
-        assert_eq!(output, Some(Dot))
+        let res: Result<Option<Dot>, _> = parse(".".chars());
+        assert_eq!(res.unwrap(), Some(Dot))
     }
 
     #[test]
     fn option_none() {
-        let (output, input) = Option::<Dot>::parse("").unwrap();
-        assert_eq!(input, "");
-        assert_eq!(output, None)
+        let res: Result<Option<Dot>, _> = parse("".chars());
+        assert_eq!(res.unwrap(), None)
     }
 
     #[test]
     fn sequence() {
-        let (output, input) = Vec::<Dot>::parse("...").unwrap();
-        assert_eq!(input, "");
-        assert_eq!(output, vec![Dot, Dot, Dot])
+        let res: Result<Vec<Dot>, _> = parse("...".chars());
+        assert_eq!(res.unwrap(), vec![Dot, Dot, Dot])
     }
 
     #[test]
     fn sequence_none() {
-        let (output, input) = Vec::<Dot>::parse("").unwrap();
-        assert_eq!(input, "");
-        assert_eq!(output, vec![])
+        let res: Result<Vec<Dot>, _> = parse("".chars());
+        assert_eq!(res.unwrap(), vec![])
     }
 
     #[test]
     fn sequence_at_least_one() {
-        let (output, input) = Vec1::<Dot>::parse("...").unwrap();
-        assert_eq!(input, "");
-        assert_eq!(output.into_inner(), vec![Dot, Dot, Dot])
+        let res: Result<Vec1<Dot>, _> = parse("...".chars());
+        assert_eq!(res.unwrap().into_inner(), vec![Dot, Dot, Dot])
     }
 
     #[test]
     fn sequence_at_least_one_but_none() {
-        let err = Vec1::<Dot>::parse("").unwrap_err();
-        assert_eq!(format!("{}", err), "error parsing tag. expected: `.`, got: ``");
+        let res: Result<Vec1<Dot>, _> = parse("".chars());
+        assert_eq!(format!("{}", res.unwrap_err()), "error parsing tag `.`");
     }
 }

@@ -8,10 +8,17 @@ pub use impls::Vec1;
 
 pub use nommy_derive::Parse;
 
-pub trait Parse: Sized {
+pub fn parse<P: Parse<I::Item>, I: IntoIterator>(iter: I) -> Result<P, P::Error> {
+    P::parse(&mut Buffer::new(iter.into_iter()))
+}
+
+pub trait Parse<T>: Sized + Peek<T> {
     type Error: Error;
 
-    fn parse(input: &str) -> Result<(Self, &str), Self::Error>;
+    fn parse(input: &mut Buffer<impl Iterator<Item=T>>) -> Result<Self, Self::Error>;
+}
+pub trait Peek<T>: Sized {
+    fn peek(input: &mut Cursor<impl Iterator<Item=T>>) -> bool;
 }
 
 pub trait Process {
@@ -48,6 +55,7 @@ impl<I: Iterator> Buffer<I> {
     pub fn cursor(&mut self) -> Cursor<I> {
         Cursor {
             buf: self,
+            base: 0,
             index: 0,
         }
     }
@@ -55,6 +63,7 @@ impl<I: Iterator> Buffer<I> {
 
 pub struct Cursor<'a, I: Iterator>{
     buf: &'a mut Buffer<I>,
+    base: usize,
     index: usize,
 }
 
@@ -62,8 +71,17 @@ impl<'a, I: Iterator> Cursor<'a, I> {
     pub fn cursor(&mut self) -> Cursor<I> {
         Cursor {
             buf: self.buf,
-            index: self.index,
+            base: self.index,
+            index: 0,
         }
+    }
+
+    pub fn close(self) -> usize {
+        self.index
+    }
+
+    pub fn skip(&mut self, n: usize) {
+        self.index += n;
     }
 }
 
@@ -71,12 +89,13 @@ impl<'a, I: Iterator> Iterator for Cursor<'a, I> where I::Item: Clone {
     type Item = I::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let output = if self.index >= self.buf.buffer.len() {
+        let i = self.base + self.index;
+        let output = if i < self.buf.buffer.len() {
+            self.buf.buffer[i].clone()
+        } else {
             let output = self.buf.iter.next()?;
             self.buf.buffer.push_back(output.clone());
             output
-        } else {
-            self.buf.buffer[self.index].clone()
         };
 
         self.index += 1;

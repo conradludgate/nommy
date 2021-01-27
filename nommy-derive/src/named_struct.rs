@@ -1,8 +1,6 @@
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote, ToTokens};
 
-use crate::util::type_contains_generic;
-
 pub struct NamedStruct {
     pub vis: syn::Visibility,
     pub name: syn::Ident,
@@ -56,99 +54,7 @@ impl ToTokens for Args {
     }
 }
 
-struct ParseRow {
-    pub error: syn::Ident,
-    pub field: NamedField,
-}
-
 use heck::CamelCase;
-impl ToTokens for ParseRow {
-    fn to_tokens(&self, tokens: &mut TokenStream2) {
-        let ParseRow { error, field } = self;
-        let NamedField { name, ty } = field;
-
-        let pascal_name = syn::Ident::new(
-            &name.to_string().to_camel_case(),
-            proc_macro2::Span::call_site(),
-        );
-
-        tokens.extend(quote! {
-            let (#name, input) = <#ty as ::nommy::Parse>::parse(input)
-                .map_err(|err| #error::#pascal_name(Box::new(err)))?;
-        })
-    }
-}
-
-struct ErrorRow {
-    pub field: NamedField,
-}
-
-impl ToTokens for ErrorRow {
-    fn to_tokens(&self, tokens: &mut TokenStream2) {
-        let NamedField { name, ty } = &self.field;
-        let pascal_name = syn::Ident::new(
-            &name.to_string().to_camel_case(),
-            proc_macro2::Span::call_site(),
-        );
-
-        tokens.extend(quote! {
-            #pascal_name(Box<<#ty as ::nommy::Parse>::Error>),
-        })
-    }
-}
-
-struct ErrorDisplayRow {
-    pub error: syn::Ident,
-    pub field: NamedField,
-}
-
-impl ToTokens for ErrorDisplayRow {
-    fn to_tokens(&self, tokens: &mut TokenStream2) {
-        let ErrorDisplayRow { error, field } = self;
-        let name = &field.name;
-
-        let pascal_name = syn::Ident::new(
-            &name.to_string().to_camel_case(),
-            proc_macro2::Span::call_site(),
-        );
-
-        let error_message = format!("could not parse field `{}`: {{}}", name.to_string());
-
-        tokens.extend(quote! {
-            #error::#pascal_name(_0) => write!(__formatter, #error_message, _0),
-        })
-    }
-}
-
-struct WhereClause {
-    pub clauses: Vec<Clause>,
-}
-
-impl ToTokens for WhereClause {
-    fn to_tokens(&self, tokens: &mut TokenStream2) {
-        if self.clauses.len() == 0 {
-            return;
-        }
-        let clauses = &self.clauses;
-
-        tokens.extend(quote! {
-            where #( #clauses ),*
-        })
-    }
-}
-
-struct Clause {
-    pub ty: syn::Type,
-}
-
-impl ToTokens for Clause {
-    fn to_tokens(&self, tokens: &mut TokenStream2) {
-        let ty = &self.ty;
-        tokens.extend(quote! {
-            #ty: ::nommy::Parse
-        })
-    }
-}
 
 impl ToTokens for NamedStruct {
     fn to_tokens(&self, tokens: &mut TokenStream2) {
@@ -159,59 +65,33 @@ impl ToTokens for NamedStruct {
             fields,
         } = self;
 
-        let mut where_clause = WhereClause { clauses: vec![] };
-        for field in fields {
-            if type_contains_generic(&field.ty, args) {
-                where_clause.clauses.push(Clause {
-                    ty: field.ty.clone(),
-                });
-            }
-        }
+        let error_name = format_ident!("{}ParseError", name);
 
-        let error = format_ident!("{}ParseError", name);
-        let args = Args(args.clone());
+        let enum_error = EnumError {
+            vis: vis.clone(),
+            name: error_name.clone(),
+            field_names: fields.iter().map(|field| field.name.clone()).collect(),
+        };
 
-        let error_rows = fields.iter().map(|field| ErrorRow {
-            field: field.clone(),
-        });
+        let peek_impl = NamedStructPeek {
+            name: name.clone(),
+            args: args.clone(),
+            fields: fields.clone(),
+        };
 
-        let error_display_rows = fields.iter().map(|field| ErrorDisplayRow {
-            error: error.clone(),
-            field: field.clone(),
-        });
-
-        let parse_rows = fields.iter().map(|field| ParseRow {
-            error: error.clone(),
-            field: field.clone(),
-        });
-
-        let field_names = fields.iter().map(|field| field.name.clone());
+        let parse_impl = NamedStructParse {
+            name: name.clone(),
+            args: args.clone(),
+            fields: fields.clone(),
+            error_name,
+        };
 
         tokens.extend(quote! {
-            #[derive(Debug, PartialEq)]
-            #vis enum #error #args #where_clause {
-                #( #error_rows )*
-            }
-            #[automatically_derived]
-            impl ::std::error::Error for #error {}
-            #[automatically_derived]
-            impl ::std::fmt::Display for #error {
-                fn fmt(&self, __formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                    match self {
-                        #( #error_display_rows )*
-                    }
-                }
-            }
+            #enum_error
 
-            #[automatically_derived]
-            impl #args ::nommy::Parse for #name #args #where_clause {
-                type Error = #error #args;
-                fn parse(input: &str) -> ::std::result::Result<(Self, &str), Self::Error> {
-                    #( #parse_rows )*
+            #peek_impl
 
-                    Ok((#name { #( #field_names ),* }, input))
-                }
-            }
+            #parse_impl
         })
     }
 }
@@ -220,4 +100,169 @@ impl ToTokens for NamedStruct {
 pub struct NamedField {
     pub name: syn::Ident,
     pub ty: syn::Type,
+}
+
+pub struct EnumError {
+    pub vis: syn::Visibility,
+    pub name: syn::Ident,
+    pub field_names: Vec<syn::Ident>,
+}
+
+impl ToTokens for EnumError {
+    fn to_tokens(&self, tokens: &mut TokenStream2) {
+        let EnumError {
+            vis,
+            name,
+            field_names,
+        } = self;
+
+        let field_type_args = field_names
+            .iter()
+            .map(|field_name| format_ident!("{}Error", field_name.to_string().to_camel_case()))
+            .collect::<Vec<_>>();
+
+        let field_type_where_clauses = field_names
+            .iter()
+            .map(|field_name| {
+                let ty = format_ident!("{}Error", field_name.to_string().to_camel_case());
+                quote! {#ty: ::std::error::Error}
+            })
+            .collect::<Vec<_>>();
+
+        let fields = field_names.iter().map(|field_name| {
+            let camel = format_ident!("{}", field_name.to_string().to_camel_case());
+            let ty = format_ident!("{}Error", camel);
+            quote! {#camel(::std::boxed::Box<#ty>)}
+        });
+
+        let error_display_rows = field_names.iter().map(|field_name| {
+            let camel = format_ident!("{}", field_name.to_string().to_camel_case());
+            let error_message = format!("could not parse field `{}`: {{}}", field_name.to_string());
+            quote! { #name::#camel(_0) => write!(__formatter, #error_message, _0) }
+        });
+
+        tokens.extend(quote! {
+            #[derive(Debug, PartialEq)]
+            #vis enum #name <#(#field_type_args),*> where #(#field_type_where_clauses),* {
+                #( #fields, )*
+            }
+            impl<#(#field_type_args),*> ::std::error::Error for #name <#(#field_type_args),*> where #(#field_type_where_clauses),* {}
+            #[automatically_derived]
+            impl<#(#field_type_args),*> ::std::fmt::Display for #name <#(#field_type_args),*> where #(#field_type_where_clauses),* {
+                fn fmt(&self, __formatter: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+                    match self {
+                        #( #error_display_rows, )*
+                    }
+                }
+            }
+        })
+    }
+}
+
+pub struct NamedStructPeek {
+    pub name: syn::Ident,
+    pub args: Vec<syn::Ident>,
+    pub fields: Vec<NamedField>,
+}
+
+impl ToTokens for NamedStructPeek {
+    fn to_tokens(&self, tokens: &mut TokenStream2) {
+        let NamedStructPeek { name, args, fields } = self;
+
+        let mut impl_args = args.clone();
+        let generic_ident = format_ident!("__T");
+        impl_args.push(generic_ident.clone());
+        let impl_args = Args(impl_args);
+
+        let args = Args(args.clone());
+
+        let peek_where_clause = fields.iter().map(|field| {
+            let ty = &field.ty;
+            quote! {#ty: ::nommy::Peek<#generic_ident>}
+        });
+
+        let peek_rows = fields.iter().map(|field| {
+            let ty = &field.ty;
+            quote! { <#ty as ::nommy::Peek<#generic_ident>>::peek(input) }
+        });
+
+        tokens.extend(quote! {
+            #[automatically_derived]
+            impl #impl_args ::nommy::Peek<#generic_ident> for #name #args
+            where #(
+                #peek_where_clause,
+            )* {
+                fn peek(input: &mut ::nommy::Cursor<impl ::std::iter::Iterator<Item=#generic_ident>>) -> bool {
+                    #( #peek_rows )&&*
+                }
+            }
+        })
+    }
+}
+
+pub struct NamedStructParse {
+    pub name: syn::Ident,
+    pub args: Vec<syn::Ident>,
+    pub fields: Vec<NamedField>,
+    pub error_name: syn::Ident,
+}
+
+impl ToTokens for NamedStructParse {
+    fn to_tokens(&self, tokens: &mut TokenStream2) {
+        let NamedStructParse {
+            name,
+            args,
+            fields,
+            error_name,
+        } = self;
+
+        let mut impl_args = args.clone();
+        let generic_ident = format_ident!("__T");
+        impl_args.push(generic_ident.clone());
+        let impl_args = Args(impl_args);
+
+        let args = Args(args.clone());
+
+        let parse_where_clause = fields.iter().map(|field| {
+            let ty = &field.ty;
+            quote! {#ty: ::nommy::Parse<#generic_ident>}
+        });
+
+        let error_type_args = fields
+            .iter()
+            .map(|field| {
+                let ty = &field.ty;
+                quote! { < #ty as ::nommy::Parse<#generic_ident>>::Error }
+            })
+            .collect::<Vec<_>>();
+
+        let parse_rows = fields
+            .iter()
+            .map(|field| {
+                let NamedField { name, ty } = field;
+                let camel = format_ident!("{}", name.to_string().to_camel_case());
+                quote!{
+                    #name: <#ty as ::nommy::Parse<#generic_ident>>::parse(input)
+                        .map_err(|err| #error_name::< #( #error_type_args ),* >::#camel(Box::new(err)))?
+                }
+            })
+            .collect::<Vec<_>>();
+
+        tokens.extend(quote! {
+            #[automatically_derived]
+            impl #impl_args ::nommy::Parse<#generic_ident> for #name #args
+            where #(
+                #parse_where_clause,
+            )* {
+                type Error = #error_name < #( #error_type_args ),* >;
+
+                fn parse(input: &mut ::nommy::Buffer<impl ::std::iter::Iterator<Item=#generic_ident>>) -> Result<Self, Self::Error> {
+                    Ok(#name{
+                        #( #parse_rows, )*
+                    })
+                    //
+                }
+            }
+        })
+    }
 }

@@ -3,7 +3,6 @@ use quote::ToTokens;
 use syn::{parse_macro_input, DeriveInput};
 
 mod named_struct;
-mod util;
 use named_struct::NamedStruct;
 
 #[proc_macro_derive(Parse)]

@@ -1,7 +1,4 @@
-use nommy::{
-    token::{LParen, RParen},
-    Parse,
-};
+use nommy::{Parse, parse, token::{LParen, RParen}};
 
 #[derive(Debug, Parse, PartialEq)]
 struct Multiple {
@@ -10,8 +7,7 @@ struct Multiple {
 }
 
 fn main() {
-    let (output, input) = Multiple::parse("().").unwrap();
-    assert_eq!(input, ".");
+    let output: Multiple = parse("().".chars()).unwrap();
     assert_eq!(
         output,
         Multiple {
@@ -20,9 +16,15 @@ fn main() {
         }
     );
 
-    let err = Multiple::parse(".").unwrap_err();
-    assert_eq!(format!("{}", err), "could not parse field `left`: error parsing tag. expected: `(`, got: `.`");
+    let res: Result<Multiple, _> = parse(".".chars());
+    assert_eq!(
+        format!("{}", res.unwrap_err()),
+        "could not parse field `left`: error parsing tag `(`"
+    );
 
-    let err = Multiple::parse("(.").unwrap_err();
-    assert_eq!(format!("{}", err), "could not parse field `right`: error parsing tag. expected: `)`, got: `.`");
+    let res: Result<Multiple, _> = parse("(.".chars());
+    assert_eq!(
+        format!("{}", res.unwrap_err()),
+        "could not parse field `right`: error parsing tag `)`"
+    );
 }

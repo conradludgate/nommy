@@ -1,16 +1,42 @@
-use crate::{Parse, Process};
+use crate::{Buffer, Cursor, Parse, Peek, Process};
 use thiserror::Error;
 #[derive(Debug, PartialEq, Error)]
-#[error("error parsing tag. expected: `{expected}`, got: {got}")]
+#[error("error parsing tag `{expected}`")]
 pub struct TokenParseError {
     pub expected: &'static str,
-    pub got: String,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Token;
+impl Process for Token {
+    type Output = Self;
+    fn process(self) -> Self::Output {
+        self
+    }
+}
+impl Peek<char> for Token {
+    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
+        const EXPECTED: &'static str = "foo";
+        EXPECTED.chars().eq(input.take(EXPECTED.len()))
+    }
+}
+impl Parse<char> for Token {
+    type Error = TokenParseError;
+    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> Result<Self, Self::Error> {
+        const EXPECTED: &'static str = "foo";
+        if EXPECTED.chars().eq(input.take(EXPECTED.len())) {
+            Ok(Token)
+        } else {
+            Err(TokenParseError { expected: EXPECTED })
+        }
+    }
 }
 
 #[macro_export]
 macro_rules! Tag {
     ($($name:ident:$expected:literal,)*) => {
         $(
+
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct $name;
@@ -20,23 +46,20 @@ impl Process for $name {
         self
     }
 }
-impl Parse for $name {
-    type Error = TokenParseError;
-    fn parse(input: &str) -> Result<(Self, &str), Self::Error> {
+impl Peek<char> for $name {
+    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
         const EXPECTED: &'static str = $expected;
-        if input.len() < EXPECTED.len() {
-            Err(TokenParseError{expected: EXPECTED, got: format!("`{}`", input)})
+        EXPECTED.chars().eq(input.take(EXPECTED.len()))
+    }
+}
+impl Parse<char> for $name {
+    type Error = TokenParseError;
+    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> Result<Self, Self::Error> {
+        const EXPECTED: &'static str = $expected;
+        if EXPECTED.chars().eq(input.take(EXPECTED.len())) {
+            Ok($name)
         } else {
-            let (a, b) = input.split_at(EXPECTED.len());
-            if a == EXPECTED {
-                Ok(($name, b))
-            } else {
-                if b.len() == 0 {
-                    Err(TokenParseError{expected: EXPECTED, got: format!("`{}`", a)})
-                } else {
-                    Err(TokenParseError{expected: EXPECTED, got: format!("`{}`...", a)})
-                }
-            }
+            Err(TokenParseError{expected: EXPECTED})
         }
     }
 }
@@ -60,55 +83,46 @@ Tag![
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Parse;
+    use crate::{parse, Parse};
 
     #[test]
     fn test_parse_matches() {
-        let input = "(){}[]<>";
-        let (_, input) = LParen::parse(input).unwrap();
-        let (_, input) = RParen::parse(input).unwrap();
-        let (_, input) = LBrace::parse(input).unwrap();
-        let (_, input) = RBrace::parse(input).unwrap();
-        let (_, input) = LBracket::parse(input).unwrap();
-        let (_, input) = RBracket::parse(input).unwrap();
-        let (_, input) = LThan::parse(input).unwrap();
-        let (_, input) = GThan::parse(input).unwrap();
-        assert_eq!(input, "");
+        let mut input = Buffer::new("(){}[]<>".chars());
+        LParen::parse(&mut input).unwrap();
+        RParen::parse(&mut input).unwrap();
+        LBrace::parse(&mut input).unwrap();
+        RBrace::parse(&mut input).unwrap();
+        LBracket::parse(&mut input).unwrap();
+        RBracket::parse(&mut input).unwrap();
+        LThan::parse(&mut input).unwrap();
+        GThan::parse(&mut input).unwrap();
+        assert!(input.next().is_none())
     }
 
     #[test]
     fn test_parse_errors() {
-        assert_eq!(
-            format!("{}", LParen::parse("1").unwrap_err()),
-            "error parsing tag. expected: `(`, got: `1`"
-        );
-        assert_eq!(
-            format!("{}", RParen::parse("1").unwrap_err()),
-            "error parsing tag. expected: `)`, got: `1`"
-        );
-        assert_eq!(
-            format!("{}", LBrace::parse("1").unwrap_err()),
-            "error parsing tag. expected: `{`, got: `1`"
-        );
-        assert_eq!(
-            format!("{}", RBrace::parse("1").unwrap_err()),
-            "error parsing tag. expected: `}`, got: `1`"
-        );
-        assert_eq!(
-            format!("{}", LBracket::parse("1").unwrap_err()),
-            "error parsing tag. expected: `[`, got: `1`"
-        );
-        assert_eq!(
-            format!("{}", RBracket::parse("1").unwrap_err()),
-            "error parsing tag. expected: `]`, got: `1`"
-        );
-        assert_eq!(
-            format!("{}", LThan::parse("1").unwrap_err()),
-            "error parsing tag. expected: `<`, got: `1`"
-        );
-        assert_eq!(
-            format!("{}", GThan::parse("1").unwrap_err()),
-            "error parsing tag. expected: `>`, got: `1`"
-        );
+        let res: Result<LParen, _> = parse("1".chars());
+        assert_eq!(format!("{}", res.unwrap_err()), "error parsing tag `(`");
+
+        let res: Result<RParen, _> = parse("1".chars());
+        assert_eq!(format!("{}", res.unwrap_err()), "error parsing tag `)`");
+
+        let res: Result<LBrace, _> = parse("1".chars());
+        assert_eq!(format!("{}", res.unwrap_err()), "error parsing tag `{`");
+
+        let res: Result<RBrace, _> = parse("1".chars());
+        assert_eq!(format!("{}", res.unwrap_err()), "error parsing tag `}`");
+
+        let res: Result<LBracket, _> = parse("1".chars());
+        assert_eq!(format!("{}", res.unwrap_err()), "error parsing tag `[`");
+
+        let res: Result<RBracket, _> = parse("1".chars());
+        assert_eq!(format!("{}", res.unwrap_err()), "error parsing tag `]`");
+
+        let res: Result<LThan, _> = parse("1".chars());
+        assert_eq!(format!("{}", res.unwrap_err()), "error parsing tag `<`");
+
+        let res: Result<GThan, _> = parse("1".chars());
+        assert_eq!(format!("{}", res.unwrap_err()), "error parsing tag `>`");
     }
 }

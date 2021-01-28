@@ -1,4 +1,6 @@
-use std::{convert::Infallible};
+use std::{convert::Infallible, ops::RangeInclusive};
+
+use text::OneInRange;
 
 use crate::*;
 
@@ -52,3 +54,82 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf<CHARS> {
         Ok(AnyOf(output))
     }
 }
+
+#[derive(Debug, Clone, PartialEq)]
+/// AnyInRange is a generic type that implements Parse to match many characters within the given range
+///
+/// ```
+/// use nommy::{Parse, Process, Buffer, text::AnyInRange};
+/// let mut buffer = Buffer::new("hello world".chars());
+/// let c = AnyInRange::<{'a'..='z'}>::parse(&mut buffer).unwrap();
+/// assert_eq!(c.process(), "hello");
+/// ```
+pub struct AnyInRange<const CHAR_RANGE: RangeInclusive<char>>(String);
+
+impl<const CHAR_RANGE: RangeInclusive<char>> Process for AnyInRange<CHAR_RANGE> {
+    type Output = String;
+    fn process(self) -> Self::Output {
+        self.0
+    }
+}
+
+impl<const CHAR_RANGE: RangeInclusive<char>> Peek<char> for AnyInRange<CHAR_RANGE> {
+    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
+        loop {
+            let mut cursor = input.cursor();
+            if !OneInRange::<CHAR_RANGE>::peek(&mut cursor) {
+                break;
+            }
+            let skip = cursor.close();
+            input.fast_forward(skip);
+        }
+        true
+    }
+}
+
+impl<const CHAR_RANGE: RangeInclusive<char>> Parse<char> for AnyInRange<CHAR_RANGE> {
+    type Error = Infallible;
+    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> Result<Self, Self::Error> {
+        let mut output = String::new();
+
+        while OneInRange::<CHAR_RANGE>::peek(&mut input.cursor()) {
+            output.push(
+                OneInRange::<CHAR_RANGE>::parse(input)
+                    .expect("peek succeeded but parse failed")
+                    .process(),
+            );
+        }
+
+        Ok(AnyInRange(output))
+    }
+}
+
+/// AnyLowercase parses any length of lower ascii letters
+///
+/// ```
+/// use nommy::{Parse, Process, Buffer, text::AnyLowercase};
+/// let mut buffer = Buffer::new("helloWorld".chars());
+/// let c = AnyLowercase::parse(&mut buffer).unwrap();
+/// assert_eq!(c.process(), "hello");
+/// ```
+pub type AnyLowercase = AnyInRange<{ 'a'..='z' }>;
+
+/// AnyUppercase parses any length of upper ascii letters
+///
+/// ```
+/// use nommy::{Parse, Process, Buffer, text::AnyUppercase};
+/// let mut buffer = Buffer::new("HELLOworld".chars());
+/// let c = AnyUppercase::parse(&mut buffer).unwrap();
+/// assert_eq!(c.process(), "HELLO");
+/// ```
+pub type AnyUppercase = AnyInRange<{ 'A'..='Z' }>;
+
+/// AnyDigits parses any length of ascii digits
+///
+/// ```
+/// use nommy::{Parse, Process, Buffer, text::AnyDigits};
+/// let mut buffer = Buffer::new("1024$".chars());
+/// let c = AnyDigits::parse(&mut buffer).unwrap();
+/// assert_eq!(c.process(), "1024");
+/// ```
+pub type AnyDigits = AnyInRange<{ '0'..='9' }>;

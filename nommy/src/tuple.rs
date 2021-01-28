@@ -81,30 +81,24 @@ Tuple!(Tuple12ParseError: T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 
 #[cfg(test)]
 mod tests {
-    use crate::{parse, text::token::*, Buffer, Parse};
+    use crate::{parse, text::Tag, Buffer, Parse};
 
     #[test]
     fn test_parse_matches_pairs() {
-        let mut input = Buffer::new("(){}[]<>".chars());
-        <(LParen, RParen)>::parse(&mut input).unwrap();
-        <(LBrace, RBrace)>::parse(&mut input).unwrap();
-        <(LBracket, RBracket)>::parse(&mut input).unwrap();
-        <(LThan, GThan)>::parse(&mut input).unwrap();
+        let mut input = Buffer::new("(){}".chars());
+        <(Tag<"(">, Tag<")">)>::parse(&mut input).unwrap();
+        <(Tag<"{">, Tag<"}">)>::parse(&mut input).unwrap();
         assert!(input.next().is_none());
     }
 
     #[test]
     fn test_parse_matches_oct() {
-        let mut input = Buffer::new("(){}[]<>".chars());
+        let mut input = Buffer::new("(){}".chars());
         <(
-            LParen,
-            RParen,
-            LBrace,
-            RBrace,
-            LBracket,
-            RBracket,
-            LThan,
-            GThan,
+            Tag<"(">,
+            Tag<")">,
+            Tag<"{">,
+            Tag<"}">,
         )>::parse(&mut input)
         .unwrap();
         assert!(input.next().is_none());
@@ -115,14 +109,10 @@ mod tests {
         let mut input = Buffer::new("(){.".chars());
         let res: Result<
             (
-                LParen,
-                RParen,
-                LBrace,
-                RBrace,
-                LBracket,
-                RBracket,
-                LThan,
-                GThan,
+                Tag<"(">,
+                Tag<")">,
+                Tag<"{">,
+                Tag<"}">,
             ),
             _,
         > = parse(&mut input);

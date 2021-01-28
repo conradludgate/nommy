@@ -1,5 +1,5 @@
 use crate::*;
-use std::{convert::Infallible, fmt};
+use std::{convert::Infallible, fmt, mem::MaybeUninit};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EnumParseError;
@@ -25,7 +25,7 @@ impl<P: Peek<T>, T> Peek<T> for Option<P> {
     }
 }
 
-/// Define Parse for Option<P>. Result is None if parsing P fails, otherwise, result is Some(p)
+/// Result is None if parsing P fails, otherwise, result is Some(p)
 impl<P: Parse<T>, T> Parse<T> for Option<P> {
     type Error = Infallible;
     fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
@@ -60,7 +60,7 @@ impl<P: Peek<T>, T> Peek<T> for Vec<P> {
     }
 }
 
-/// Define Parse for Vec<P>. Repeatedly attempts to parse P, Result is all successful attempts
+/// Repeatedly attempts to parse P, Result is all successful attempts
 impl<P: Parse<T>, T> Parse<T> for Vec<P> {
     type Error = Infallible;
     fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
@@ -121,7 +121,8 @@ impl<P: Peek<T>, T> Peek<T> for Vec1<P> {
     }
 }
 
-/// Define Parse for Vec1<P>. Repeatedly attempt to parse P, Result is all successful attempts. Must parse P at least once
+/// Repeatedly attempt to parse P, Result is all successful attempts
+/// Must parse P at least once
 impl<P: Parse<T>, T> Parse<T> for Vec1<P> {
     type Error = P::Error;
     fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
@@ -141,45 +142,92 @@ impl<P: Process> Process for Vec1<P> {
     }
 }
 
+impl<P: Peek<T>, T, const N: usize> Peek<T> for [P; N] {
+    fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool {
+        for _ in 0..N {
+            if !P::peek(input) {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+/// Parse P N times into [P; N], fails if any step fails
+///
+/// ```
+/// use nommy::{parse, text::Tag};
+/// let _: [Tag<".">; 3] = parse("...".chars()).unwrap();
+/// ```
+impl<P: Parse<T>, T, const N: usize> Parse<T> for [P; N] {
+    type Error = P::Error;
+    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
+        // safety: we only return the new data if no errors occured,
+        // and if no errors occured, then we definitely filled all N spaces
+        // therefore the array was initialised.
+        unsafe {
+            let mut output = MaybeUninit::uninit_array();
+            for i in 0..N {
+                *output[i].as_mut_ptr() = P::parse(input)?;
+            }
+
+            Ok(MaybeUninit::array_assume_init(output))
+        }
+    }
+}
+
+impl<P: Process, const N: usize> Process for [P; N] {
+    type Output = [P::Output; N];
+    fn process(self) -> Self::Output {
+        self.map(P::process)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{parse, text::token::*};
+    use crate::{parse, text::Tag};
 
     use super::Vec1;
 
     #[test]
     fn option() {
-        let res: Result<Option<Dot>, _> = parse(".".chars());
-        assert_eq!(res.unwrap(), Some(Dot))
+        let res: Option<Tag<".">> = parse(".".chars()).unwrap();
+        assert!(res.is_some());
     }
 
     #[test]
     fn option_none() {
-        let res: Result<Option<Dot>, _> = parse("".chars());
-        assert_eq!(res.unwrap(), None)
+        let res: Option<Tag<".">> = parse("".chars()).unwrap();
+        assert!(res.is_none());
     }
 
     #[test]
     fn sequence() {
-        let res: Result<Vec<Dot>, _> = parse("...".chars());
-        assert_eq!(res.unwrap(), vec![Dot, Dot, Dot])
+        let res: Vec<Tag<".">> = parse("...".chars()).unwrap();
+        assert_eq!(res.len(), 3);
+    }
+
+    #[test]
+    fn count() {
+        let _: [Tag<".">; 3] = parse("...".chars()).unwrap();
     }
 
     #[test]
     fn sequence_none() {
-        let res: Result<Vec<Dot>, _> = parse("".chars());
-        assert_eq!(res.unwrap(), vec![])
+        let res: Vec<Tag<".">> = parse("-".chars()).unwrap();
+        assert!(res.is_empty())
     }
 
     #[test]
     fn sequence_at_least_one() {
-        let res: Result<Vec1<Dot>, _> = parse("...".chars());
-        assert_eq!(res.unwrap().into_inner(), vec![Dot, Dot, Dot])
+        let res: Vec1<Tag<".">> = parse("...".chars()).unwrap();
+        assert_eq!(res.into_inner().len(), 3);
     }
 
     #[test]
     fn sequence_at_least_one_but_none() {
-        let res: Result<Vec1<Dot>, _> = parse("".chars());
+        let res: Result<Vec1<Tag<".">>, _> = parse("-".chars());
         assert_eq!(format!("{}", res.unwrap_err()), "error parsing tag `.`");
     }
 }

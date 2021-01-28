@@ -1,28 +1,28 @@
-use nommy::{Buffer, Parse, text::token::{Dot, LParen, RParen}};
+use nommy::{Buffer, Parse, text::Tag};
 
 #[derive(Debug, Parse, PartialEq)]
 enum Enum {
-    Open(LParen),
+    Open(Tag<"(">),
     Dot{
-        dot1: Dot,
-        dot2: Dot,
-        dot3: Dot,
+        dot1: Tag<".">,
+        dot2: Tag<".">,
+        dot3: Tag<".">,
     },
-    Close(RParen),
+    Close(Tag<")">),
 }
 
 fn main() {
     let mut input = Buffer::new("(...)".chars());
 
-    assert_eq!(Enum::parse(&mut input).unwrap(), Enum::Open(LParen));
+    assert_eq!(Enum::parse(&mut input).unwrap(), Enum::Open(Tag::<"(">));
 
     assert_eq!(Enum::parse(&mut input).unwrap(), Enum::Dot{
-        dot1: Dot,
-        dot2: Dot,
-        dot3: Dot,
+        dot1: Tag::<".">,
+        dot2: Tag::<".">,
+        dot3: Tag::<".">,
     });
 
-    assert_eq!(Enum::parse(&mut input).unwrap(), Enum::Close(RParen));
+    assert_eq!(Enum::parse(&mut input).unwrap(), Enum::Close(Tag::<")">));
 
     assert_eq!(input.next(), None);
 }

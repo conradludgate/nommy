@@ -1,6 +1,6 @@
 [package]
 name = "nommy"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Conrad Ludgate <conradludgate@gmail.com>"]
 edition = "2018"
 description = "Type based parser"

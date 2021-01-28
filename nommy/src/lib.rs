@@ -1,49 +1,119 @@
+#![feature(array_map)]
+#![feature(maybe_uninit_uninit_array)]
+#![feature(maybe_uninit_array_assume_init)]
+#![allow(incomplete_features)]
+#![feature(const_generics)]
+
+//! Type based parsing library
+//!
+//! ```
+//! use nommy::{parse, Parse, text::Tag};
+//!
+//! #[derive(Parse)]
+//! struct FooBar {
+//!     foo: Tag<"foo">,
+//!     bar: Tag<"bar">,
+//! }
+//!
+//! let _: FooBar = parse("foobar".chars()).unwrap();
+//!
+//! #[derive(Parse, PartialEq, Debug)]
+//! enum FooOrBar {
+//!     Foo(Tag<"foo">),
+//!     Bar(Tag<"bar">),
+//! }
+//!
+//! let output: FooOrBar = parse("foo".chars()).unwrap();
+//! assert_eq!(output, FooOrBar::Foo(Tag::<"foo">));
+//!
+//! let output: FooOrBar = parse("bar".chars()).unwrap();
+//! assert_eq!(output, FooOrBar::Bar(Tag::<"bar">));
+//! ```
+
 pub mod impls;
 pub mod surrounded;
 pub mod tuple;
 pub mod text;
 
-use std::{collections::VecDeque, error::Error};
+use std::{collections::VecDeque, error::Error, fmt};
 
 pub use impls::Vec1;
 
 /// Derive Parse for structs or enums
 ///
 /// ```
-/// use nommy::{parse, Parse, TextTag};
-///
-/// TextTag![Foo: "foo", Bar: "bar"];
+/// use nommy::{parse, Parse, text::Tag};
 ///
 /// #[derive(Parse)]
 /// struct FooBar {
-///     foo: Foo,
-///     bar: Bar,
+///     foo: Tag<"foo">,
+///     bar: Tag<"bar">,
 /// }
 ///
 /// let _: FooBar = parse("foobar".chars()).unwrap();
 ///
 /// #[derive(Parse, PartialEq, Debug)]
 /// enum FooOrBar {
-///     Foo(Foo),
-///     Bar(Bar),
+///     Foo(Tag<"foo">),
+///     Bar(Tag<"bar">),
 /// }
 ///
 /// let output: FooOrBar = parse("foo".chars()).unwrap();
-/// assert_eq!(output, FooOrBar::Foo(Foo));
+/// assert_eq!(output, FooOrBar::Foo(Tag::<"foo">));
 ///
 /// let output: FooOrBar = parse("bar".chars()).unwrap();
-/// assert_eq!(output, FooOrBar::Bar(Bar));
+/// assert_eq!(output, FooOrBar::Bar(Tag::<"bar">));
 /// ```
 pub use nommy_derive::Parse;
 
 /// parse takes the given iterator, putting it through `P::parse`
 ///
 /// ```
-/// use nommy::{parse, text::token::Dot};
-/// let dot: Dot = parse(".".chars()).unwrap();
+/// use nommy::{parse, text::Tag};
+/// let dot: Tag<"."> = parse(".".chars()).unwrap();
 /// ```
 pub fn parse<P: Parse<I::Item>, I: IntoIterator>(iter: I) -> Result<P, P::Error> {
     P::parse(&mut Buffer::new(iter))
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum TerminatedError<E> {
+    ParseError(E),
+    NotTerminated,
+}
+impl<E> From<E> for TerminatedError<E> {
+    fn from(e: E) -> Self {
+        TerminatedError::ParseError(e)
+    }
+}
+impl<E> Error for TerminatedError<E> where E: Error {}
+impl<E> fmt::Display for TerminatedError<E> where E: Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TerminatedError::ParseError(e) => write!(f, "there was an error parsing the input: {}", e),
+            TerminatedError::NotTerminated => write!(f, "there was an error parsing the input: full input not consumed"),
+        }
+    }
+}
+
+/// parse_terminated takes the given iterator, putting it through `P::parse`,
+/// erroring if the full input was not consumed
+///
+/// ```
+/// use nommy::{parse_terminated, text::Tag};
+/// let res: Result<Tag<".">, _> = parse_terminated(".".chars());
+/// res.unwrap();
+/// let res: Result<Tag<".">, _> = parse_terminated("..".chars());
+/// res.unwrap_err();
+/// ```
+pub fn parse_terminated<P: Parse<I::Item>, I: IntoIterator>(iter: I) -> Result<P, TerminatedError<P::Error>> {
+    let mut buffer = Buffer::new(iter);
+    let output = P::parse(&mut buffer)?;
+    if buffer.next().is_some() {
+        Err(TerminatedError::NotTerminated)
+    } else {
+        Ok(output)
+    }
 }
 
 /// An interface for creating and composing parsers
@@ -52,9 +122,9 @@ pub fn parse<P: Parse<I::Item>, I: IntoIterator>(iter: I) -> Result<P, P::Error>
 /// Parse can be derived for some types
 ///
 /// ```
-/// use nommy::{Parse, Buffer, text::token::Dot};
+/// use nommy::{Parse, Buffer, text::Tag};
 /// let mut buffer = Buffer::new(".".chars());
-/// assert_eq!(Dot::parse(&mut buffer), Ok(Dot));
+/// Tag::<".">::parse(&mut buffer).unwrap();
 /// ```
 pub trait Parse<T>: Sized + Peek<T> {
     type Error: Error;
@@ -69,9 +139,9 @@ pub trait Parse<T>: Sized + Peek<T> {
 /// the [Parse::parse] function, it should succeed.
 ///
 /// ```
-/// use nommy::{Peek, Buffer, text::token::Dot};
+/// use nommy::{Peek, Buffer, text::Tag};
 /// let mut buffer = Buffer::new(".".chars());
-/// assert!(Dot::peek(&mut buffer.cursor()));
+/// assert!(Tag::<".">::peek(&mut buffer.cursor()));
 /// ```
 pub trait Peek<T>: Sized {
     fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool;

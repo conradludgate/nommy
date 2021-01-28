@@ -1,9 +1,9 @@
-use nommy::{Parse, parse, text::token::{LParen, RParen}};
+use nommy::{Parse, parse, text::Tag};
 
 #[derive(Debug, Parse, PartialEq)]
 struct Multiple {
-    left: LParen,
-    right: RParen,
+    left: Tag<"(">,
+    right: Tag<")">,
 }
 
 fn main() {
@@ -11,8 +11,8 @@ fn main() {
     assert_eq!(
         output,
         Multiple {
-            left: LParen,
-            right: RParen
+            left: Tag::<"(">,
+            right: Tag::<")">,
         }
     );
 

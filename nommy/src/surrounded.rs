@@ -184,24 +184,21 @@ impl<Prefix, P: Process, Suffix> Process for SurroundedBy<Prefix, P, Suffix> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{parse, text::token::*};
+    use crate::{parse, text::Tag};
     use super::*;
 
     #[test]
     fn prefixed_by() {
-        let prefixed: PrefixedBy<LParen, Dot> = parse("(.".chars()).unwrap();
-        assert_eq!(prefixed.process(), Dot);
+        let _: PrefixedBy<Tag<"(">, Tag<".">> = parse("(.".chars()).unwrap();
     }
 
     #[test]
     fn suffixed_by() {
-        let suffixed: SuffixedBy<Dot, RParen> = parse(".)".chars()).unwrap();
-        assert_eq!(suffixed.process(), Dot);
+        let _: SuffixedBy<Tag<".">, Tag<")">> = parse(".)".chars()).unwrap();
     }
 
     #[test]
     fn surrounded_by() {
-        let surrounded: SurroundedBy<LParen, Dot, RParen> = parse("(.)".chars()).unwrap();
-        assert_eq!(surrounded.process(), Dot);
+        let _: SurroundedBy<Tag<"(">, Tag<".">, Tag<")">> = parse("(.)".chars()).unwrap();
     }
 }

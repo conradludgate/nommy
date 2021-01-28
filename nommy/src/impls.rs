@@ -1,5 +1,15 @@
 use crate::*;
-use std::convert::Infallible;
+use std::{convert::Infallible, fmt};
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EnumParseError;
+impl std::error::Error for EnumParseError{}
+impl fmt::Display for EnumParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "no variants of the enum could be parsed")
+    }
+}
+
 
 impl<P: Peek<T>, T> Peek<T> for Option<P> {
     fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool {
@@ -15,9 +25,7 @@ impl<P: Peek<T>, T> Peek<T> for Option<P> {
     }
 }
 
-/// Define Parse for Option<P>.
-/// Result is None if parsing P fails
-/// Otherwise, result is Some(p)
+/// Define Parse for Option<P>. Result is None if parsing P fails, otherwise, result is Some(p)
 impl<P: Parse<T>, T> Parse<T> for Option<P> {
     type Error = Infallible;
     fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
@@ -52,9 +60,7 @@ impl<P: Peek<T>, T> Peek<T> for Vec<P> {
     }
 }
 
-/// Define Parse for Vec<P>.
-/// Repeatedly attempt to parse P,
-/// Result is all successful attempts
+/// Define Parse for Vec<P>. Repeatedly attempts to parse P, Result is all successful attempts
 impl<P: Parse<T>, T> Parse<T> for Vec<P> {
     type Error = Infallible;
     fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
@@ -115,9 +121,7 @@ impl<P: Peek<T>, T> Peek<T> for Vec1<P> {
     }
 }
 
-/// Define Parse for Vec1<P>.
-/// Repeatedly attempt to parse P,
-/// Result is all successful attempts
+/// Define Parse for Vec1<P>. Repeatedly attempt to parse P, Result is all successful attempts. Must parse P at least once
 impl<P: Parse<T>, T> Parse<T> for Vec1<P> {
     type Error = P::Error;
     fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
@@ -139,7 +143,7 @@ impl<P: Process> Process for Vec1<P> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{parse, token::*};
+    use crate::{parse, text::token::*};
 
     use super::Vec1;
 

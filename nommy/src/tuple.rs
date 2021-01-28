@@ -5,6 +5,8 @@ macro_rules! Tuple {
     ($error:ident: $($T:ident),*) => {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+/// Error type returned from failing to parse a tuple.
+/// Variant will correspond to the parser that failed
 pub enum $error<$($T),*> where $($T: Error),* {
     $(
         $T($T),
@@ -12,7 +14,7 @@ pub enum $error<$($T),*> where $($T: Error),* {
 }
 
 impl<$($T: Error),*> Error for $error<$($T),*>  {}
-impl<$($T: Error),*>  fmt::Display for $error<$($T),*>  {
+impl<$($T: Error),*> fmt::Display for $error<$($T),*>  {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut i = 0;
         $(
@@ -26,15 +28,18 @@ impl<$($T: Error),*>  fmt::Display for $error<$($T),*>  {
     }
 }
 
+/// Implements Peek over a tuple. Returns true if all elements
+/// of the tuple return true, in order
 impl<T, $($T),*> Peek<T> for ($($T),*) where $($T: Peek<T>),* {
     fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool {
         $(
-            $T::peek(input) &&
-        )*
-        true
+            $T::peek(input)
+        )&&*
     }
 }
 
+/// Implements Parse over a tuple. Parses all elements of the tuple
+/// in order
 impl<T, $($T),*> Parse<T> for ($($T),*) where $($T: Parse<T>),* {
     type Error = $error<$($T::Error),*>;
 
@@ -45,6 +50,7 @@ impl<T, $($T),*> Parse<T> for ($($T),*) where $($T: Parse<T>),* {
     }
 }
 
+/// Implements Process over a tuple. Result is [Process::process] applied to all the elements of the tuple
 impl<$($T),*> Process for ($($T),*) where $($T: Process),* {
     type Output = ($($T::Output),*);
 
@@ -75,8 +81,7 @@ Tuple!(Tuple12ParseError: T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
 
 #[cfg(test)]
 mod tests {
-    use crate::{parse, Parse};
-    use crate::{token::*, Buffer};
+    use crate::{parse, text::token::*, Buffer, Parse};
 
     #[test]
     fn test_parse_matches_pairs() {

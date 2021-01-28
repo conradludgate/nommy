@@ -184,7 +184,7 @@ impl<Prefix, P: Process, Suffix> Process for SurroundedBy<Prefix, P, Suffix> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{parse, token::*};
+    use crate::{parse, text::token::*};
     use super::*;
 
     #[test]

@@ -2,6 +2,7 @@ use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::{parse_macro_input, DeriveInput};
 
+mod enum_impl;
 mod named_struct;
 use named_struct::NamedStruct;
 
@@ -21,10 +22,7 @@ pub fn derive_parse(input: TokenStream) -> TokenStream {
                 unimplemented!()
             }
         },
-        syn::Data::Enum(e) => {
-            eprintln!("enum variants: {:?}", e.variants);
-            unimplemented!()
-        }
+        syn::Data::Enum(e) => enum_impl::Enum::new(&input, e).into_token_stream(),
         syn::Data::Union(_) => panic!("unions not supported"),
     }
     .into()

@@ -16,14 +16,14 @@ impl fmt::Display for TokenParseError {
 /// Create a new Tag parse type.
 ///
 /// ```
-/// use nommy::{parse, Tag};
+/// use nommy::{parse, TextTag};
 /// // Create a unit struct named `Struct` which parses the tag `struct`
-/// Tag!{Struct: "struct"}
+/// TextTag!{Struct: "struct"}
 ///
 /// // we can now call parse for our `Struct` type
 /// let _: Struct = parse("struct".chars()).unwrap();
 /// ```
-macro_rules! Tag {
+macro_rules! TextTag {
     ($($name:ident: $expected:literal),*) => {
         $(
 
@@ -45,13 +45,13 @@ impl $crate::Peek<char> for $name {
 }
 
 impl $crate::Parse<char> for $name {
-    type Error = $crate::token::TokenParseError;
+    type Error = $crate::text::token::TokenParseError;
     fn parse(input: &mut $crate::Buffer<impl Iterator<Item = char>>) -> Result<Self, Self::Error> {
         const EXPECTED: &'static str = $expected;
         if EXPECTED.chars().eq(input.take(EXPECTED.len())) {
             Ok($name)
         } else {
-            Err($crate::token::TokenParseError{expected: EXPECTED})
+            Err($crate::text::token::TokenParseError{expected: EXPECTED})
         }
     }
 }
@@ -60,7 +60,7 @@ impl $crate::Parse<char> for $name {
     };
 }
 
-Tag![
+TextTag![
     LParen: "(",
     RParen: ")",
     LBrace: "{",

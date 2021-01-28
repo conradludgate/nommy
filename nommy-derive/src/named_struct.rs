@@ -1,4 +1,4 @@
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 
 pub struct NamedStruct {
@@ -39,10 +39,10 @@ impl NamedStruct {
     }
 }
 
-struct Args(Vec<syn::Ident>);
+pub struct Args(pub Vec<syn::Ident>);
 
 impl ToTokens for Args {
-    fn to_tokens(&self, tokens: &mut TokenStream2) {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         if self.0.len() == 0 {
             return;
         }
@@ -57,7 +57,7 @@ impl ToTokens for Args {
 use heck::CamelCase;
 
 impl ToTokens for NamedStruct {
-    fn to_tokens(&self, tokens: &mut TokenStream2) {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let NamedStruct {
             vis,
             name,
@@ -109,7 +109,7 @@ pub struct EnumError {
 }
 
 impl ToTokens for EnumError {
-    fn to_tokens(&self, tokens: &mut TokenStream2) {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let EnumError {
             vis,
             name,
@@ -166,11 +166,11 @@ pub struct NamedStructPeek {
 }
 
 impl ToTokens for NamedStructPeek {
-    fn to_tokens(&self, tokens: &mut TokenStream2) {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let NamedStructPeek { name, args, fields } = self;
 
         let mut impl_args = args.clone();
-        let generic_ident = format_ident!("__T");
+        let generic_ident = format_ident!("__PeekType");
         impl_args.push(generic_ident.clone());
         let impl_args = Args(impl_args);
 
@@ -208,7 +208,7 @@ pub struct NamedStructParse {
 }
 
 impl ToTokens for NamedStructParse {
-    fn to_tokens(&self, tokens: &mut TokenStream2) {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         let NamedStructParse {
             name,
             args,
@@ -217,7 +217,7 @@ impl ToTokens for NamedStructParse {
         } = self;
 
         let mut impl_args = args.clone();
-        let generic_ident = format_ident!("__T");
+        let generic_ident = format_ident!("__ParseType");
         impl_args.push(generic_ident.clone());
         let impl_args = Args(impl_args);
 

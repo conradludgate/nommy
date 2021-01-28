@@ -1,4 +1,4 @@
-use nommy::{Parse, parse, token::{LParen, RParen}};
+use nommy::{Parse, parse, text::token::{LParen, RParen}};
 
 #[derive(Debug, Parse, PartialEq)]
 struct Multiple {

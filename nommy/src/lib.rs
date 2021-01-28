@@ -1,18 +1,18 @@
 pub mod impls;
 pub mod surrounded;
-pub mod token;
 pub mod tuple;
+pub mod text;
 
 use std::{collections::VecDeque, error::Error};
 
 pub use impls::Vec1;
 
-/// Derive Parse for structs
+/// Derive Parse for structs or enums
 ///
 /// ```
-/// use nommy::{parse, Parse, Tag};
+/// use nommy::{parse, Parse, TextTag};
 ///
-/// Tag![Foo: "foo", Bar: "bar"];
+/// TextTag![Foo: "foo", Bar: "bar"];
 ///
 /// #[derive(Parse)]
 /// struct FooBar {
@@ -21,13 +21,25 @@ pub use impls::Vec1;
 /// }
 ///
 /// let _: FooBar = parse("foobar".chars()).unwrap();
+///
+/// #[derive(Parse, PartialEq, Debug)]
+/// enum FooOrBar {
+///     Foo(Foo),
+///     Bar(Bar),
+/// }
+///
+/// let output: FooOrBar = parse("foo".chars()).unwrap();
+/// assert_eq!(output, FooOrBar::Foo(Foo));
+///
+/// let output: FooOrBar = parse("bar".chars()).unwrap();
+/// assert_eq!(output, FooOrBar::Bar(Bar));
 /// ```
 pub use nommy_derive::Parse;
 
 /// parse takes the given iterator, putting it through `P::parse`
 ///
 /// ```
-/// use nommy::{parse, token::Dot};
+/// use nommy::{parse, text::token::Dot};
 /// let dot: Dot = parse(".".chars()).unwrap();
 /// ```
 pub fn parse<P: Parse<I::Item>, I: IntoIterator>(iter: I) -> Result<P, P::Error> {
@@ -40,9 +52,9 @@ pub fn parse<P: Parse<I::Item>, I: IntoIterator>(iter: I) -> Result<P, P::Error>
 /// Parse can be derived for some types
 ///
 /// ```
-/// use nommy::*;
+/// use nommy::{Parse, Buffer, text::token::Dot};
 /// let mut buffer = Buffer::new(".".chars());
-/// assert_eq!(token::Dot::parse(&mut buffer), Ok(token::Dot));
+/// assert_eq!(Dot::parse(&mut buffer), Ok(Dot));
 /// ```
 pub trait Parse<T>: Sized + Peek<T> {
     type Error: Error;
@@ -57,9 +69,9 @@ pub trait Parse<T>: Sized + Peek<T> {
 /// the [Parse::parse] function, it should succeed.
 ///
 /// ```
-/// use nommy::*;
+/// use nommy::{Peek, Buffer, text::token::Dot};
 /// let mut buffer = Buffer::new(".".chars());
-/// assert!(token::Dot::peek(&mut buffer.cursor()));
+/// assert!(Dot::peek(&mut buffer.cursor()));
 /// ```
 pub trait Peek<T>: Sized {
     fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool;

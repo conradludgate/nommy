@@ -1,4 +1,4 @@
-use nommy::{parse, token::LParen, Parse};
+use nommy::{parse, text::token::LParen, Parse};
 
 #[derive(Debug, Parse, PartialEq)]
 struct Single {

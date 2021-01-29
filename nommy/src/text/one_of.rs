@@ -1,20 +1,6 @@
 use crate::*;
 use std::{fmt, ops::RangeInclusive};
 
-#[derive(Debug, PartialEq)]
-/// Error type returned by [OneOf]'s [parse](Parse::parse) function
-pub struct OneOfError<const CHARS: &'static str>(Option<char>);
-
-impl<const CHARS: &'static str> std::error::Error for OneOfError<CHARS> {}
-impl<const CHARS: &'static str> fmt::Display for OneOfError<CHARS> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0 {
-            Some(c) => write!(f, "error parsing one of {:?}, found {:?}", CHARS, c),
-            None => write!(f, "error parsing one of {:?}, EOF", CHARS),
-        }
-    }
-}
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 /// OneOf is a generic type that implements Parse to match one character within the given string
 ///
@@ -43,21 +29,23 @@ impl<const CHARS: &'static str> Peek<char> for OneOf<CHARS> {
 }
 
 impl<const CHARS: &'static str> Parse<char> for OneOf<CHARS> {
-    type Error = OneOfError<CHARS>;
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> Result<Self, Self::Error> {
+    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> eyre::Result<Self> {
         match input.next() {
             Some(c) => {
                 if CHARS.contains(c) {
                     Ok(OneOf(c))
                 } else {
-                    Err(OneOfError(Some(c)))
+                    Err(eyre::eyre!(
+                        "error parsing one of {:?}, found {:?}",
+                        CHARS,
+                        c
+                    ))
                 }
             }
-            None => Err(OneOfError(None)),
+            None => Err(eyre::eyre!("error parsing one of {:?}, reached EOF", CHARS)),
         }
     }
 }
-
 
 #[derive(Debug, PartialEq)]
 /// Error type returned by [OneInRange]'s [parse](Parse::parse) function
@@ -67,7 +55,11 @@ impl<const CHAR_RANGE: RangeInclusive<char>> std::error::Error for OneInRangeErr
 impl<const CHAR_RANGE: RangeInclusive<char>> fmt::Display for OneInRangeError<CHAR_RANGE> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.0 {
-            Some(c) => write!(f, "error parsing one char in {:?}, found {:?}", CHAR_RANGE, c),
+            Some(c) => write!(
+                f,
+                "error parsing one char in {:?}, found {:?}",
+                CHAR_RANGE, c
+            ),
             None => write!(f, "error parsing one char in {:?}, EOF", CHAR_RANGE),
         }
     }
@@ -77,10 +69,10 @@ impl<const CHAR_RANGE: RangeInclusive<char>> fmt::Display for OneInRangeError<CH
 /// OneInRange is a generic type that implements Parse to match one character within the given range
 ///
 /// ```
-/// use nommy::{Parse, Process, Buffer, text::OneOf};
-/// let mut buffer = Buffer::new("-".chars());
-/// let c = OneOf::<"-_">::parse(&mut buffer).unwrap();
-/// assert_eq!(c.process(), '-');
+/// use nommy::{Parse, Process, Buffer, text::OneInRange};
+/// let mut buffer = Buffer::new("12".chars());
+/// let c = OneInRange::<{'0'..='9'}>::parse(&mut buffer).unwrap();
+/// assert_eq!(c.process(), '1');
 /// ```
 pub struct OneInRange<const CHAR_RANGE: RangeInclusive<char>>(char);
 
@@ -101,17 +93,16 @@ impl<const CHAR_RANGE: RangeInclusive<char>> Peek<char> for OneInRange<CHAR_RANG
 }
 
 impl<const CHAR_RANGE: RangeInclusive<char>> Parse<char> for OneInRange<CHAR_RANGE> {
-    type Error = OneInRangeError<CHAR_RANGE>;
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> Result<Self, Self::Error> {
+    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> eyre::Result<Self> {
         match input.next() {
             Some(c) => {
                 if CHAR_RANGE.contains(&c) {
                     Ok(OneInRange(c))
                 } else {
-                    Err(OneInRangeError(Some(c)))
+                    Err(eyre::eyre!("could not parse char in range {:?}, found {:?}", CHAR_RANGE, c))
                 }
             }
-            None => Err(OneInRangeError(None)),
+            None => Err(eyre::eyre!("could not parse char in range {:?}, reached EOF", CHAR_RANGE)),
         }
     }
 }
@@ -124,7 +115,7 @@ impl<const CHAR_RANGE: RangeInclusive<char>> Parse<char> for OneInRange<CHAR_RAN
 /// let c = OneLowercase::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), 'h');
 /// ```
-pub type OneLowercase = OneInRange<{'a'..='z'}>;
+pub type OneLowercase = OneInRange<{ 'a'..='z' }>;
 
 /// OneUppercase parses one character that matches any upper ascii letters
 ///
@@ -134,7 +125,7 @@ pub type OneLowercase = OneInRange<{'a'..='z'}>;
 /// let c = OneUppercase::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), 'H');
 /// ```
-pub type OneUppercase = OneInRange<{'A'..='Z'}>;
+pub type OneUppercase = OneInRange<{ 'A'..='Z' }>;
 
 /// OneDigits parses one character that matches any ascii digits
 ///
@@ -144,4 +135,4 @@ pub type OneUppercase = OneInRange<{'A'..='Z'}>;
 /// let c = OneDigits::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), '1');
 /// ```
-pub type OneDigits = OneInRange<{'0'..='9'}>;
+pub type OneDigits = OneInRange<{ '0'..='9' }>;

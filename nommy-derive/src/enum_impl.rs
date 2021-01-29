@@ -1,7 +1,9 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 
-use crate::named_struct::{Args, NamedField};
+use crate::attr::FieldAttr;
+
+use super::named_struct::{Args, NamedField};
 
 pub struct Enum {
     pub name: syn::Ident,
@@ -30,9 +32,19 @@ impl Enum {
                         named
                             .named
                             .iter()
-                            .map(|field| NamedField {
-                                name: field.ident.clone().unwrap(),
-                                ty: field.ty.clone(),
+                            .cloned()
+                            .map(|field| {
+                                let mut attrs = FieldAttr::default();
+                                for attr in field.attrs {
+                                    if attr.path.is_ident("nommy") {
+                                        attrs.parse_attr(attr.tokens.clone());
+                                    }
+                                }
+                                NamedField {
+                                    attrs,
+                                    name: field.ident.unwrap(),
+                                    ty: field.ty,
+                                }
                             })
                             .collect(),
                     ),
@@ -199,7 +211,7 @@ impl ToTokens for EnumParse {
                 EnumFieldType::Named(n) => {
                     let t = n.iter().map(|f|&f.ty);
                     let sets = n.iter().map(|f| {
-                        let NamedField { name, ty } = f;
+                        let NamedField { attrs: _, name, ty } = f;
                         quote!{
                             #name: <#ty as ::nommy::Parse<#generic_ident>>::parse(input)
                                 .map_err(|_| ::nommy::impls::EnumParseError)?
@@ -218,17 +230,18 @@ impl ToTokens for EnumParse {
             }
         });
 
+        let error_message = format!("no variants of {} could be parsed", name);
+
         tokens.extend(quote! {
             #[automatically_derived]
             impl #impl_args ::nommy::Parse<#generic_ident> for #name #args
             where #(
                 #parse_where_clause,
             )* {
-                type Error = ::nommy::impls::EnumParseError;
-                fn parse(input: &mut ::nommy::Buffer<impl Iterator<Item = #generic_ident>>) -> Result<Self, Self::Error> {
+                fn parse(input: &mut ::nommy::Buffer<impl Iterator<Item = #generic_ident>>) -> ::nommy::eyre::Result<Self> {
                     #( #parse_rows )*
 
-                    Err(::nommy::impls::EnumParseError)
+                    Err(::nommy::eyre::eyre!(#error_message))
                 }
             }
         })

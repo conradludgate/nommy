@@ -42,12 +42,10 @@ impl<Prefix: Peek<T>, P: Peek<T>, T> Peek<T> for PrefixedBy<Prefix, P> {
 /// Define Parse for PrefixedBy<P>.
 /// Parse Prefix then parse P
 impl<Prefix: Parse<T>, P: Parse<T>, T> Parse<T> for PrefixedBy<Prefix, P> {
-    type Error = PrefixedByParseError<Prefix::Error, P::Error>;
-    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
+    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> eyre::Result<Self> {
         Ok(PrefixedBy {
-            prefix: Prefix::parse(input)
-                .map_err(|err| PrefixedByParseError::Prefix(Box::new(err)))?,
-            parsed: P::parse(input).map_err(|err| PrefixedByParseError::Parsed(Box::new(err)))?,
+            prefix: Prefix::parse(input).wrap_err("could not parse prefix")?,
+            parsed: P::parse(input).wrap_err("could not parse body")?,
         })
     }
 }
@@ -66,32 +64,8 @@ pub struct SuffixedBy<P, Suffix> {
     pub suffix: Suffix,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum SuffixedByParseError<ParseError, SuffixParseError>
-where
-    ParseError: Error,
-    SuffixParseError: Error,
-{
-    Parsed(Box<ParseError>),
-    Suffix(Box<SuffixParseError>),
-}
 
-impl<SuffixParseError: Error, ParseError: Error> Error
-    for SuffixedByParseError<SuffixParseError, ParseError>
-{
-}
-impl<SuffixParseError: Error, ParseError: Error> fmt::Display
-    for SuffixedByParseError<SuffixParseError, ParseError>
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self {
-            SuffixedByParseError::Parsed(e) => write!(f, "could not parse body: {}", e),
-            SuffixedByParseError::Suffix(e) => write!(f, "could not parse suffix: {}", e),
-        }
-    }
-}
-
-impl<Suffix: Peek<T>, P: Peek<T>, T> Peek<T> for SuffixedBy<Suffix, P> {
+impl<Suffix: Peek<T>, P: Peek<T>, T> Peek<T> for SuffixedBy<P, Suffix> {
     fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool {
         P::peek(input) && Suffix::peek(input)
     }
@@ -100,12 +74,10 @@ impl<Suffix: Peek<T>, P: Peek<T>, T> Peek<T> for SuffixedBy<Suffix, P> {
 /// Define Parse for SuffixedBy<P>.
 /// Parse Suffix then parse P
 impl<P: Parse<T>, Suffix: Parse<T>, T> Parse<T> for SuffixedBy<P, Suffix> {
-    type Error = SuffixedByParseError<P::Error, Suffix::Error>;
-    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
+    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> eyre::Result<Self> {
         Ok(SuffixedBy {
-            parsed: P::parse(input).map_err(|err| SuffixedByParseError::Parsed(Box::new(err)))?,
-            suffix: Suffix::parse(input)
-                .map_err(|err| SuffixedByParseError::Suffix(Box::new(err)))?,
+            parsed: P::parse(input).wrap_err("could not parse body")?,
+            suffix: Suffix::parse(input).wrap_err("could not parse suffix")?,
         })
     }
 }
@@ -126,34 +98,6 @@ pub struct SurroundedBy<Prefix, P, Suffix> {
     pub suffix: Suffix,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum SurroundedByParseError<PrefixParseError, ParseError, SuffixParseError>
-where
-    PrefixParseError: Error,
-    ParseError: Error,
-    SuffixParseError: Error,
-{
-    Prefix(Box<PrefixParseError>),
-    Parsed(Box<ParseError>),
-    Suffix(Box<SuffixParseError>),
-}
-
-impl<PrefixParseError: Error, ParseError: Error, SuffixParseError: Error> Error
-    for SurroundedByParseError<PrefixParseError, ParseError, SuffixParseError>
-{
-}
-impl<PrefixParseError: Error, ParseError: Error, SuffixParseError: Error> fmt::Display
-    for SurroundedByParseError<PrefixParseError, ParseError, SuffixParseError>
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self {
-            SurroundedByParseError::Prefix(e) => write!(f, "could not parse prefix: {}", e),
-            SurroundedByParseError::Parsed(e) => write!(f, "could not parse body: {}", e),
-            SurroundedByParseError::Suffix(e) => write!(f, "could not parse suffix: {}", e),
-        }
-    }
-}
-
 impl<Prefix: Peek<T>, P: Peek<T>, Suffix: Peek<T>, T> Peek<T> for SurroundedBy<Prefix, P, Suffix> {
     fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool {
         Prefix::peek(input) && P::peek(input) && Suffix::peek(input)
@@ -163,14 +107,11 @@ impl<Prefix: Peek<T>, P: Peek<T>, Suffix: Peek<T>, T> Peek<T> for SurroundedBy<P
 /// Define Parse for SurroundedBy<P>.
 /// Parse Prefix then parse P
 impl<Prefix: Parse<T>, P: Parse<T>, Suffix: Parse<T>, T> Parse<T> for SurroundedBy<Prefix, P, Suffix> {
-    type Error = SurroundedByParseError<Prefix::Error, P::Error, Suffix::Error>;
-    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
+    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> eyre::Result<Self> {
         Ok(SurroundedBy {
-            prefix: Prefix::parse(input)
-                .map_err(|err| SurroundedByParseError::Prefix(Box::new(err)))?,
-            parsed: P::parse(input).map_err(|err| SurroundedByParseError::Parsed(Box::new(err)))?,
-            suffix: Suffix::parse(input)
-                .map_err(|err| SurroundedByParseError::Suffix(Box::new(err)))?,
+            prefix: Prefix::parse(input).wrap_err("could not parse prefix")?,
+            parsed: P::parse(input).wrap_err("could not parse body")?,
+            suffix: Suffix::parse(input).wrap_err("could not parse suffix")?,
         })
     }
 }
@@ -200,5 +141,29 @@ mod tests {
     #[test]
     fn surrounded_by() {
         let _: SurroundedBy<Tag<"(">, Tag<".">, Tag<")">> = parse("(.)".chars()).unwrap();
+    }
+
+    #[test]
+    fn prefixed_by_peek() {
+        let mut input = Buffer::new("(.".chars());
+        let mut cursor = input.cursor();
+        assert!(PrefixedBy::<Tag<"(">, Tag<".">>::peek(&mut cursor));
+        assert!(cursor.next().is_none());
+    }
+
+    #[test]
+    fn suffixed_by_peek() {
+        let mut input = Buffer::new(".)".chars());
+        let mut cursor = input.cursor();
+        assert!(SuffixedBy::<Tag<".">, Tag<")">>::peek(&mut cursor));
+        assert!(cursor.next().is_none());
+    }
+
+    #[test]
+    fn surrounded_by_peek() {
+        let mut input = Buffer::new("(.)".chars());
+        let mut cursor = input.cursor();
+        assert!(SurroundedBy::<Tag<"(">, Tag<".">, Tag<")">>::peek(&mut cursor));
+        assert!(cursor.next().is_none());
     }
 }

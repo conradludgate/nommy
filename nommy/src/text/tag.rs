@@ -1,16 +1,6 @@
+use std::iter::FromIterator;
+
 use crate::*;
-use std::fmt;
-
-#[derive(Debug, PartialEq)]
-/// Error type returned by [Tag]'s [parse](Parse::parse) function
-pub struct TagParseError<const TAG: &'static str>;
-
-impl<const TAG: &'static str> std::error::Error for TagParseError<TAG> {}
-impl<const TAG: &'static str> fmt::Display for TagParseError<TAG> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "error parsing tag `{}`", TAG)
-    }
-}
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 /// Tag is a generic type that implements Parse to match the given string exactly
@@ -37,12 +27,12 @@ impl<const TAG: &'static str> Peek<char> for Tag<TAG> {
 }
 
 impl<const TAG: &'static str> Parse<char> for Tag<TAG> {
-    type Error = TagParseError<TAG>;
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> Result<Self, Self::Error> {
-        if TAG.chars().eq(input.take(TAG.len())) {
+    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> eyre::Result<Self> {
+        let s = String::from_iter(input.take(TAG.len()));
+        if TAG == &s {
             Ok(Tag)
         } else {
-            Err(TagParseError)
+            Err(eyre::eyre!("failed to parse tag {:?}, found {:?}", TAG, s))
         }
     }
 }
@@ -69,9 +59,9 @@ mod tests {
     #[test]
     fn test_parse_errors() {
         let res: Result<Tag<"(">, _> = parse("1".chars());
-        assert_eq!(format!("{}", res.unwrap_err()), "error parsing tag `(`");
+        assert_eq!(format!("{}", res.unwrap_err()), "failed to parse tag \"(\"");
 
         let res: Result<Tag<")">, _> = parse("1".chars());
-        assert_eq!(format!("{}", res.unwrap_err()), "error parsing tag `)`");
+        assert_eq!(format!("{}", res.unwrap_err()), "failed to parse tag \")\"");
     }
 }

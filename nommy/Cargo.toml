@@ -10,3 +10,4 @@ readme = "../README.md"
 
 [dependencies]
 nommy_derive = { path = "../nommy-derive", version = "=0.1.1" }
+eyre = "0.6"

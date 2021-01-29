@@ -32,11 +32,13 @@
 
 pub mod impls;
 pub mod surrounded;
-pub mod tuple;
+// pub mod tuple;
+// pub mod bytes;
 pub mod text;
 
-use std::{collections::VecDeque, error::Error, fmt};
+use std::collections::VecDeque;
 
+use eyre::Context;
 pub use impls::Vec1;
 
 /// Derive Parse for structs or enums
@@ -66,34 +68,16 @@ pub use impls::Vec1;
 /// ```
 pub use nommy_derive::Parse;
 
+pub use eyre;
+
 /// parse takes the given iterator, putting it through `P::parse`
 ///
 /// ```
 /// use nommy::{parse, text::Tag};
 /// let dot: Tag<"."> = parse(".".chars()).unwrap();
 /// ```
-pub fn parse<P: Parse<I::Item>, I: IntoIterator>(iter: I) -> Result<P, P::Error> {
+pub fn parse<P: Parse<I::Item>, I: IntoIterator>(iter: I) -> eyre::Result<P> {
     P::parse(&mut Buffer::new(iter))
-}
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum TerminatedError<E> {
-    ParseError(E),
-    NotTerminated,
-}
-impl<E> From<E> for TerminatedError<E> {
-    fn from(e: E) -> Self {
-        TerminatedError::ParseError(e)
-    }
-}
-impl<E> Error for TerminatedError<E> where E: Error {}
-impl<E> fmt::Display for TerminatedError<E> where E: Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            TerminatedError::ParseError(e) => write!(f, "there was an error parsing the input: {}", e),
-            TerminatedError::NotTerminated => write!(f, "there was an error parsing the input: full input not consumed"),
-        }
-    }
 }
 
 /// parse_terminated takes the given iterator, putting it through `P::parse`,
@@ -106,11 +90,11 @@ impl<E> fmt::Display for TerminatedError<E> where E: Error {
 /// let res: Result<Tag<".">, _> = parse_terminated("..".chars());
 /// res.unwrap_err();
 /// ```
-pub fn parse_terminated<P: Parse<I::Item>, I: IntoIterator>(iter: I) -> Result<P, TerminatedError<P::Error>> {
+pub fn parse_terminated<P: Parse<I::Item>, I: IntoIterator>(iter: I) -> eyre::Result<P> {
     let mut buffer = Buffer::new(iter);
     let output = P::parse(&mut buffer)?;
     if buffer.next().is_some() {
-        Err(TerminatedError::NotTerminated)
+        Err(eyre::eyre!("input was not parsed completely"))
     } else {
         Ok(output)
     }
@@ -127,9 +111,7 @@ pub fn parse_terminated<P: Parse<I::Item>, I: IntoIterator>(iter: I) -> Result<P
 /// Tag::<".">::parse(&mut buffer).unwrap();
 /// ```
 pub trait Parse<T>: Sized + Peek<T> {
-    type Error: Error;
-
-    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error>;
+    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> eyre::Result<Self>;
 }
 
 /// An interface with dealing with parser-peeking.

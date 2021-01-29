@@ -1,4 +1,4 @@
-use std::ops::RangeInclusive;
+use std::{convert::Infallible, ops::RangeInclusive};
 
 use text::OneInRange;
 
@@ -39,7 +39,8 @@ impl<const CHARS: &'static str> Peek<char> for AnyOf<CHARS> {
 }
 
 impl<const CHARS: &'static str> Parse<char> for AnyOf<CHARS> {
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> eyre::Result<Self> {
+    type Error = Infallible;
+    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> Result<Self, Self::Error> {
         let mut output = String::new();
 
         while OneOf::<CHARS>::peek(&mut input.cursor()) {
@@ -87,7 +88,8 @@ impl<const CHAR_RANGE: RangeInclusive<char>> Peek<char> for AnyInRange<CHAR_RANG
 }
 
 impl<const CHAR_RANGE: RangeInclusive<char>> Parse<char> for AnyInRange<CHAR_RANGE> {
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> eyre::Result<Self> {
+    type Error = Infallible;
+    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> Result<Self, Self::Error> {
         let mut output = String::new();
 
         while OneInRange::<CHAR_RANGE>::peek(&mut input.cursor()) {
@@ -131,16 +133,3 @@ pub type AnyUppercase = AnyInRange<{ 'A'..='Z' }>;
 /// assert_eq!(c.process(), "1024");
 /// ```
 pub type AnyDigits = AnyInRange<{ '0'..='9' }>;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn any_of_peek() {
-        let mut buffer = Buffer::new("1024$".chars());
-        let mut cursor = buffer.cursor();
-        assert!(AnyOf::<"0123456789">::peek(&mut cursor));
-        assert_eq!(cursor.next(), Some('$'));
-    }
-}

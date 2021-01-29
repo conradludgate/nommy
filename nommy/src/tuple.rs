@@ -45,7 +45,7 @@ impl<T, $($T),*> Parse<T> for ($($T),*) where $($T: Parse<T>),* {
 
     fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
         Ok(($(
-            $T::parse(input).map_err(|e| $error::$T(e))?,
+            $T::parse(input).map_err($error::$T)?,
         )*))
     }
 }
@@ -118,7 +118,7 @@ mod tests {
         > = parse(&mut input);
         assert_eq!(
             format!("{}", res.unwrap_err()),
-            "error parsing term 4: error parsing tag `}`"
+            "error parsing term 4: error parsing tag \"}\""
         );
     }
 }

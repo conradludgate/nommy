@@ -59,9 +59,9 @@ mod tests {
     #[test]
     fn test_parse_errors() {
         let res: Result<Tag<"(">, _> = parse("1".chars());
-        assert_eq!(format!("{}", res.unwrap_err()), "failed to parse tag \"(\"");
+        assert_eq!(format!("{}", res.unwrap_err()), "failed to parse tag \"(\", found \"1\"");
 
         let res: Result<Tag<")">, _> = parse("1".chars());
-        assert_eq!(format!("{}", res.unwrap_err()), "failed to parse tag \")\"");
+        assert_eq!(format!("{}", res.unwrap_err()), "failed to parse tag \")\", found \"1\"");
     }
 }

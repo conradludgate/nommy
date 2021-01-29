@@ -4,4 +4,5 @@ fn tests() {
     t.pass("tests/single.rs");
     t.pass("tests/multiple.rs");
     t.pass("tests/enum.rs");
+    t.pass("tests/mega.rs");
 }

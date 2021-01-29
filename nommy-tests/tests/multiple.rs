@@ -1,8 +1,6 @@
 use nommy::{Parse, parse, text::Tag, eyre::Result};
 
 #[derive(Debug, Parse, PartialEq)]
-#[nommy(prefix = Tag<"struct">, suffix = Tag<"Suffix">)]
-#[nommy(ignore_whitespace = "spaces")]
 struct Multiple {
     left: Tag<"(">,
     right: Tag<")">,
@@ -24,10 +22,10 @@ fn main() {
         "could not parse field `left`
 
 Caused by:
-    failed to parse tag \"(\"
+    failed to parse tag \"(\", found \".\"
 
 Location:
-    /home/oon/code/rust/parser-proc-macro/nommy/src/text/tag.rs:32:17"
+    /home/oon/code/rust/parser-proc-macro/nommy/src/text/tag.rs:35:17"
     );
 
     let res: Result<Multiple> = parse("(.".chars());
@@ -36,9 +34,9 @@ Location:
         "could not parse field `right`
 
 Caused by:
-    failed to parse tag \")\"
+    failed to parse tag \")\", found \".\"
 
 Location:
-    /home/oon/code/rust/parser-proc-macro/nommy/src/text/tag.rs:32:17"
+    /home/oon/code/rust/parser-proc-macro/nommy/src/text/tag.rs:35:17"
     );
 }

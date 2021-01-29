@@ -15,9 +15,9 @@ fn main() {
         "could not parse field `only`
 
 Caused by:
-    failed to parse tag \"(\"
+    failed to parse tag \"(\", found \".\"
 
 Location:
-    /home/oon/code/rust/parser-proc-macro/nommy/src/text/tag.rs:32:17"
+    /home/oon/code/rust/parser-proc-macro/nommy/src/text/tag.rs:35:17"
     );
 }

@@ -231,6 +231,6 @@ mod tests {
     #[test]
     fn sequence_at_least_one_but_none() {
         let res: Result<Vec1<Tag<".">>, _> = parse("-".chars());
-        assert_eq!(format!("{}", res.unwrap_err()), "failed to parse tag \".\"");
+        assert_eq!(format!("{}", res.unwrap_err()), "failed to parse tag \".\", found \"-\"");
     }
 }

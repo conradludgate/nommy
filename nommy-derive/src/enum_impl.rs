@@ -1,9 +1,13 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 
-use crate::attr::{FieldAttr, GlobalAttr, IgnoreWS};
-
-use super::named_struct::NamedField;
+use crate::{
+    attr::{FieldAttr, GlobalAttr},
+    parsers::{
+        path_from_idents, FieldPeeker, NamedField, NamedFieldParser, UnnamedField,
+        UnnamedFieldParser,
+    },
+};
 
 #[derive(Clone)]
 pub struct EnumInput {
@@ -97,12 +101,6 @@ pub enum EnumFieldType {
     Named(Vec<NamedField>),
 }
 
-#[derive(Debug, Clone)]
-pub struct UnnamedField {
-    pub attrs: FieldAttr,
-    pub ty: syn::Type,
-}
-
 pub struct EnumOutput {
     peek_impl: EnumPeek,
     parse_impl: EnumParse,
@@ -129,7 +127,6 @@ pub struct EnumPeek {
     pub where_clause_types: Vec<syn::Type>,
     pub args: Vec<syn::Ident>,
     pub peek_type: syn::Ident,
-    pub after_each: TokenStream,
 }
 
 impl EnumPeek {
@@ -145,7 +142,6 @@ impl EnumPeek {
             where_clause_types: vec![],
             args: input.args,
             peek_type,
-            after_each: Default::default(),
         };
 
         peek_impl.enrich(input.fields);
@@ -154,19 +150,6 @@ impl EnumPeek {
     }
 
     fn enrich(&mut self, fields: Vec<EnumField>) {
-        if let Some(ws) = &self.attrs.ignore_whitespace {
-            let ty: syn::Type = match ws {
-                IgnoreWS::Spaces => {
-                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::Space>}).unwrap()
-                }
-                IgnoreWS::All => {
-                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::WhiteSpace>}).unwrap()
-                }
-            };
-            self.where_clause_types.push(ty.clone());
-            self.after_each.extend(self.peek_tokens(&ty))
-        }
-
         let name = self.name.clone();
         self.fn_impl.extend(quote! {if true});
         for field in fields {
@@ -184,76 +167,32 @@ impl EnumPeek {
         self.fn_impl.extend(quote! {{ return false; }});
     }
 
-    fn peek(&mut self, peeker: syn::Type) -> TokenStream {
-        self.where_clause_types.push(peeker.clone());
-        let mut tokens = self.peek_tokens(&peeker);
-        tokens.extend(self.after_each.clone());
-        tokens
-    }
-
-    fn peek_tokens(&self, peeker: &syn::Type) -> TokenStream {
-        let peek_type = &self.peek_type;
-        quote! {
-            if !(<#peeker as ::nommy::Peek<#peek_type>>::peek(input)) { return false }
-        }
-    }
-
     fn add_struct_peek(&mut self, named: Vec<NamedField>) {
-        let mut tokens = TokenStream::new();
-
-        if let Some(prefix) = self.attrs.prefix.clone() {
-            tokens.extend(self.peek(prefix));
-        }
-
-        for field in named {
-            let NamedField { attrs, name: _, ty } = field;
-
-            if let Some(prefix) = attrs.prefix.clone() {
-                tokens.extend(self.peek(prefix));
+        self.peek_fn_impl.push(
+            FieldPeeker {
+                attrs: &self.attrs,
+                peek_type: &self.peek_type,
+                fields: named
+                    .into_iter()
+                    .map(|field| {
+                        let NamedField { attrs, name: _, ty } = field;
+                        UnnamedField { attrs, ty }
+                    })
+                    .collect(),
             }
-
-            let parser = attrs.parser.clone().unwrap_or(ty.clone());
-            tokens.extend(self.peek(parser));
-
-            if let Some(suffix) = attrs.suffix.clone() {
-                tokens.extend(self.peek(suffix));
-            }
-        }
-
-        if let Some(suffix) = self.attrs.suffix.clone() {
-            tokens.extend(self.peek(suffix));
-        }
-
-        self.peek_fn_impl.push(tokens)
+            .to_tokens(&mut self.where_clause_types),
+        );
     }
 
     fn add_tuple_peek(&mut self, unnamed: Vec<UnnamedField>) {
-        let mut tokens = TokenStream::new();
-
-        if let Some(prefix) = self.attrs.prefix.clone() {
-            tokens.extend(self.peek(prefix));
-        }
-
-        for field in unnamed {
-            let UnnamedField { attrs, ty } = field;
-
-            if let Some(prefix) = attrs.prefix.clone() {
-                tokens.extend(self.peek(prefix));
+        self.peek_fn_impl.push(
+            FieldPeeker {
+                attrs: &self.attrs,
+                peek_type: &self.peek_type,
+                fields: unnamed,
             }
-
-            let parser = attrs.parser.clone().unwrap_or(ty.clone());
-            tokens.extend(self.peek(parser));
-
-            if let Some(suffix) = attrs.suffix.clone() {
-                tokens.extend(self.peek(suffix));
-            }
-        }
-
-        if let Some(suffix) = self.attrs.suffix.clone() {
-            tokens.extend(self.peek(suffix));
-        }
-
-        self.peek_fn_impl.push(tokens)
+            .to_tokens(&mut self.where_clause_types),
+        );
     }
 }
 
@@ -264,14 +203,13 @@ impl ToTokens for EnumPeek {
             peek_fn_names,
             peek_fn_impl,
             attrs: _,
-            after_each: _,
             name,
             where_clause_types,
             args,
             peek_type,
         } = self;
 
-        let where_clause = quote!{
+        let where_clause = quote! {
             where #(
                 #where_clause_types: ::nommy::Peek<#peek_type>,
             )*
@@ -308,7 +246,6 @@ pub struct EnumParse {
     pub where_clause_types: Vec<syn::Type>,
     pub args: Vec<syn::Ident>,
     pub parse_type: syn::Ident,
-    pub after_each: TokenStream,
 }
 
 impl EnumParse {
@@ -324,7 +261,6 @@ impl EnumParse {
             where_clause_types: vec![],
             args: input.args,
             parse_type,
-            after_each: Default::default(),
         };
 
         parse_impl.enrich(input.fields);
@@ -333,23 +269,6 @@ impl EnumParse {
     }
 
     fn enrich(&mut self, fields: Vec<EnumField>) {
-        if let Some(ws) = &self.attrs.ignore_whitespace {
-            let ty: syn::Type = match ws {
-                IgnoreWS::Spaces => {
-                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::Space>}).unwrap()
-                }
-                IgnoreWS::All => {
-                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::WhiteSpace>}).unwrap()
-                }
-            };
-            self.where_clause_types.push(ty.clone());
-            self.after_each.extend(self.parse_tokens(
-                &ty,
-                "parsing whitespace should not fail, but did".to_string(),
-                false,
-            ))
-        }
-
         let name = self.name.clone();
         for field in fields {
             let peek = format_ident!("__peek_{}", field.name.to_string().to_lowercase());
@@ -368,166 +287,28 @@ impl EnumParse {
         }
     }
 
-    fn parse(&mut self, parser: syn::Type, error: String, process: bool) -> TokenStream {
-        self.where_clause_types.push(parser.clone());
-        let mut tokens = self.parse_tokens(&parser, error, process);
-        tokens.extend(self.after_each.clone());
-        tokens
-    }
-
-    fn parse_tokens(&self, parser: &syn::Type, error: String, process: bool) -> TokenStream {
-        let parse_type = &self.parse_type;
-        if process {
-            quote! {
-                <#parser as ::nommy::Parse<#parse_type>>::parse(input).wrap_err(#error)?.process();
-            }
-        } else {
-            quote! {
-                <#parser as ::nommy::Parse<#parse_type>>::parse(input).wrap_err(#error)?;
-            }
-        }
-    }
-
     fn add_struct_parse(&mut self, variant_name: syn::Ident, named: Vec<NamedField>) {
-        let mut tokens = TokenStream::new();
-
-        if let Some(prefix) = self.attrs.prefix.clone() {
-            tokens.extend(self.parse(
-                prefix,
-                format!("failed to parse prefix for enum `{}`", self.name),
-                false,
-            ));
-        }
-
-        let mut output = TokenStream::new();
-
-        for field in named {
-            let NamedField { attrs, name, ty } = field;
-
-            if let Some(prefix) = attrs.prefix.clone() {
-                tokens.extend(self.parse(
-                    prefix,
-                    format!(
-                        "failed to parse prefix for field `{}` in variant `{}`",
-                        name, variant_name
-                    ),
-                    false,
-                ));
+        self.parse_fn_impl.push(
+            NamedFieldParser {
+                struct_path: path_from_idents(vec![self.name.clone(), variant_name]),
+                attrs: &self.attrs,
+                parse_type: &self.parse_type,
+                fields: named,
             }
-
-            let parser = attrs.parser.clone().unwrap_or(ty.clone());
-            tokens.extend(quote! {let #name = });
-            tokens.extend(self.parse(
-                parser,
-                format!(
-                    "could not parse field `{}` in variant `{}`",
-                    name, variant_name
-                ),
-                attrs.parser.is_some(),
-            ));
-
-            if let Some(suffix) = attrs.suffix.clone() {
-                tokens.extend(self.parse(
-                    suffix,
-                    format!(
-                        "failed to parse suffix for field `{}` in variant `{}`",
-                        name, variant_name
-                    ),
-                    false,
-                ));
-            }
-
-            output.extend(quote! {
-                #name: #name.into(),
-            })
-        }
-
-        if let Some(suffix) = self.attrs.suffix.clone() {
-            tokens.extend(self.parse(
-                suffix,
-                format!("failed to parse suffix for enum `{}`", self.name),
-                false,
-            ));
-        }
-
-        let enum_name = &self.name;
-        tokens.extend(quote! {
-            Ok(#enum_name::#variant_name{
-                #output
-            })
-        });
-
-        self.parse_fn_impl.push(tokens)
+            .to_tokens(&mut self.where_clause_types),
+        );
     }
 
     fn add_tuple_parse(&mut self, variant_name: syn::Ident, unnamed: Vec<UnnamedField>) {
-        let mut tokens = TokenStream::new();
-
-        if let Some(prefix) = self.attrs.prefix.clone() {
-            tokens.extend(self.parse(
-                prefix,
-                format!("failed to parse prefix for enum `{}`", self.name),
-                false,
-            ));
-        }
-
-        let mut output = TokenStream::new();
-
-        for (i, field) in unnamed.into_iter().enumerate() {
-            let UnnamedField { attrs, ty } = field;
-            let name = format_ident!("field{}", i);
-
-            if let Some(prefix) = attrs.prefix.clone() {
-                tokens.extend(self.parse(
-                    prefix,
-                    format!(
-                        "failed to parse prefix for field {} in variant `{}`",
-                        i, variant_name
-                    ),
-                    false,
-                ));
+        self.parse_fn_impl.push(
+            UnnamedFieldParser {
+                tuple_path: path_from_idents(vec![self.name.clone(), variant_name]),
+                attrs: &self.attrs,
+                parse_type: &self.parse_type,
+                fields: unnamed,
             }
-
-            let parser = attrs.parser.clone().unwrap_or(ty.clone());
-            tokens.extend(quote! {let #name = });
-            tokens.extend(self.parse(
-                parser,
-                format!("could not parse field {} in variant `{}`", i, variant_name),
-                attrs.parser.is_some(),
-            ));
-
-            if let Some(suffix) = attrs.suffix.clone() {
-                tokens.extend(self.parse(
-                    suffix,
-                    format!(
-                        "failed to parse suffix for field {} in variant `{}`",
-                        i, variant_name
-                    ),
-                    false,
-                ));
-            }
-
-            output.extend(quote! {
-                #name.into(),
-            })
-        }
-
-        if let Some(suffix) = self.attrs.suffix.clone() {
-            tokens.extend(self.parse(
-                suffix,
-                format!("failed to parse suffix for enum `{}`", self.name),
-                false,
-            ));
-        }
-
-        let enum_name = &self.name;
-        tokens.extend(quote! {
-            Ok(#enum_name::#variant_name(
-                #output
-            ))
-        });
-
-        self.parse_fn_impl.push(tokens)
+            .to_tokens(&mut self.where_clause_types),
+        );
     }
 }
 
@@ -538,7 +319,6 @@ impl ToTokens for EnumParse {
             parse_fn_names,
             parse_fn_impl,
             attrs: _,
-            after_each: _,
             name,
             where_clause_types,
             args,
@@ -547,7 +327,7 @@ impl ToTokens for EnumParse {
 
         let error_message = format!("no variants of {} could be parsed", name);
 
-        let where_clause = quote!{
+        let where_clause = quote! {
             where #(
                 #where_clause_types: ::nommy::Parse<#parse_type>,
             )*

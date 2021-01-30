@@ -1,44 +1,42 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 
-use crate::{attr::{FieldAttr, GlobalAttr}, parsers::{FieldPeeker, NamedField, NamedFieldParser, UnnamedField, path_from_ident}};
+use crate::{
+    attr::{FieldAttr, GlobalAttr},
+    parsers::UnnamedField,
+    parsers::{path_from_ident, FieldPeeker, UnnamedFieldParser},
+};
 
 #[derive(Clone)]
-pub struct NamedStructInput {
+pub struct TupleStructInput {
     pub attrs: GlobalAttr,
     pub name: syn::Ident,
     pub args: Vec<syn::Ident>,
-    pub fields: Vec<NamedField>,
+    pub fields: Vec<UnnamedField>,
 }
 
-impl NamedStructInput {
+impl TupleStructInput {
     pub fn new(
         name: syn::Ident,
         generics: syn::Generics,
         attrs: Vec<syn::Attribute>,
-        fields: syn::FieldsNamed,
+        fields: syn::FieldsUnnamed,
     ) -> Self {
         let args = generics.type_params().cloned().map(|tp| tp.ident).collect();
 
         let fields = fields
-            .named
+            .unnamed
             .into_iter()
             .map(|field| {
-                let syn::Field {
-                    ident, attrs, ty, ..
-                } = field;
+                let syn::Field { attrs, ty, .. } = field;
                 let attrs = FieldAttr::parse_attrs(attrs);
-                NamedField {
-                    attrs,
-                    name: ident.unwrap(),
-                    ty,
-                }
+                UnnamedField { attrs, ty }
             })
             .collect();
 
         let attrs = GlobalAttr::parse_attrs(attrs);
 
-        NamedStructInput {
+        TupleStructInput {
             attrs,
             name,
             args,
@@ -46,22 +44,22 @@ impl NamedStructInput {
         }
     }
 
-    pub fn process(self) -> NamedStructOutput {
-        NamedStructOutput {
-            peek_impl: NamedStructPeek::new(self.clone()),
-            parse_impl: NamedStructParse::new(self),
+    pub fn process(self) -> TupleStructOutput {
+        TupleStructOutput {
+            peek_impl: TupleStructPeek::new(self.clone()),
+            parse_impl: TupleStructParse::new(self),
         }
     }
 }
 
-pub struct NamedStructOutput {
-    peek_impl: NamedStructPeek,
-    parse_impl: NamedStructParse,
+pub struct TupleStructOutput {
+    peek_impl: TupleStructPeek,
+    parse_impl: TupleStructParse,
 }
 
-impl ToTokens for NamedStructOutput {
+impl ToTokens for TupleStructOutput {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let NamedStructOutput {
+        let TupleStructOutput {
             peek_impl,
             parse_impl,
         } = self;
@@ -71,7 +69,14 @@ impl ToTokens for NamedStructOutput {
     }
 }
 
-pub struct NamedStructPeek {
+#[derive(Debug, Clone)]
+pub struct NamedField {
+    pub attrs: FieldAttr,
+    pub name: syn::Ident,
+    pub ty: syn::Type,
+}
+
+pub struct TupleStructPeek {
     pub fn_impl: TokenStream,
     pub attrs: GlobalAttr,
     pub name: syn::Ident,
@@ -81,11 +86,11 @@ pub struct NamedStructPeek {
     pub after_each: TokenStream,
 }
 
-impl NamedStructPeek {
-    fn new(input: NamedStructInput) -> Self {
+impl TupleStructPeek {
+    fn new(input: TupleStructInput) -> Self {
         let peek_type = format_ident!("__PeekType");
 
-        let mut peek_impl = NamedStructPeek {
+        let mut peek_impl = TupleStructPeek {
             fn_impl: Default::default(),
             attrs: input.attrs,
             name: input.name,
@@ -100,27 +105,21 @@ impl NamedStructPeek {
         peek_impl
     }
 
-    fn enrich(&mut self, fields: Vec<NamedField>) {
+    fn enrich(&mut self, fields: Vec<UnnamedField>) {
         self.fn_impl.extend(
             FieldPeeker {
                 attrs: &self.attrs,
                 peek_type: &self.peek_type,
-                fields: fields
-                    .into_iter()
-                    .map(|field| {
-                        let NamedField { attrs, name: _, ty } = field;
-                        UnnamedField { attrs, ty }
-                    })
-                    .collect(),
+                fields,
             }
             .to_tokens(&mut self.where_clause_types),
         );
     }
 }
 
-impl ToTokens for NamedStructPeek {
+impl ToTokens for TupleStructPeek {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let NamedStructPeek {
+        let TupleStructPeek {
             fn_impl,
             attrs: _,
             after_each: _,
@@ -145,7 +144,7 @@ impl ToTokens for NamedStructPeek {
     }
 }
 
-pub struct NamedStructParse {
+pub struct TupleStructParse {
     pub fn_impl: TokenStream,
     pub attrs: GlobalAttr,
     pub name: syn::Ident,
@@ -155,11 +154,11 @@ pub struct NamedStructParse {
     pub after_each: TokenStream,
 }
 
-impl NamedStructParse {
-    fn new(input: NamedStructInput) -> Self {
+impl TupleStructParse {
+    fn new(input: TupleStructInput) -> Self {
         let parse_type = format_ident!("__ParseType");
 
-        let mut parse_impl = NamedStructParse {
+        let mut parse_impl = TupleStructParse {
             fn_impl: Default::default(),
             attrs: input.attrs,
             name: input.name,
@@ -174,10 +173,10 @@ impl NamedStructParse {
         parse_impl
     }
 
-    fn enrich(&mut self, fields: Vec<NamedField>) {
+    fn enrich(&mut self, fields: Vec<UnnamedField>) {
         self.fn_impl.extend(
-            NamedFieldParser {
-                struct_path: path_from_ident(self.name.clone()),
+            UnnamedFieldParser {
+                tuple_path: path_from_ident(self.name.clone()),
                 attrs: &self.attrs,
                 parse_type: &self.parse_type,
                 fields,
@@ -187,9 +186,9 @@ impl NamedStructParse {
     }
 }
 
-impl ToTokens for NamedStructParse {
+impl ToTokens for TupleStructParse {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let NamedStructParse {
+        let TupleStructParse {
             fn_impl,
             attrs: _,
             after_each: _,

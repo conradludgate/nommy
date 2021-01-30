@@ -3,14 +3,15 @@ use quote::{format_ident, quote, ToTokens};
 
 use crate::attr::{FieldAttr, GlobalAttr, IgnoreWS};
 
-pub struct NamedStruct {
+#[derive(Clone)]
+pub struct NamedStructInput {
     pub attrs: GlobalAttr,
     pub name: syn::Ident,
     pub args: Vec<syn::Ident>,
     pub fields: Vec<NamedField>,
 }
 
-impl NamedStruct {
+impl NamedStructInput {
     pub fn new(derive: &syn::DeriveInput, syn_fields: &syn::FieldsNamed) -> Self {
         let name = derive.ident.clone();
 
@@ -47,60 +48,36 @@ impl NamedStruct {
             }
         }
 
-        NamedStruct {
+        NamedStructInput {
             attrs,
             name,
             args,
             fields,
         }
     }
-}
 
-pub struct Args(pub Vec<syn::Ident>);
-
-impl ToTokens for Args {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        if self.0.is_empty() {
-            return;
+    pub fn process(self) -> NamedStructOutput {
+        NamedStructOutput {
+            peek_impl: NamedStructPeek::new(self.clone()),
+            parse_impl: NamedStructParse::new(self),
         }
-        let args = &self.0;
-
-        tokens.extend(quote! {
-            < #( #args ),* >
-        })
     }
 }
 
-impl ToTokens for NamedStruct {
+pub struct NamedStructOutput {
+    peek_impl: NamedStructPeek,
+    parse_impl: NamedStructParse,
+}
+
+impl ToTokens for NamedStructOutput {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        let NamedStruct {
-            attrs,
-            name,
-            args,
-            fields,
+        let NamedStructOutput {
+            peek_impl,
+            parse_impl
         } = self;
 
-        let peek_impl = NamedStructPeek {
-            attrs: attrs.clone(),
-            name: name.clone(),
-            args: args.clone(),
-            fields: fields.clone(),
-            peek_type: format_ident!("__PeekType"),
-        };
-
-        let parse_impl = NamedStructParse {
-            attrs: attrs.clone(),
-            name: name.clone(),
-            args: args.clone(),
-            fields: fields.clone(),
-            parse_type: format_ident!("__ParseType"),
-        };
-
-        tokens.extend(quote! {
-            #peek_impl
-
-            #parse_impl
-        })
+        peek_impl.to_tokens(tokens);
+        parse_impl.to_tokens(tokens);
     }
 }
 
@@ -112,18 +89,82 @@ pub struct NamedField {
 }
 
 pub struct NamedStructPeek {
+    pub fn_impl: TokenStream,
     pub attrs: GlobalAttr,
     pub name: syn::Ident,
+    pub where_clause_types: Vec<syn::Type>,
     pub args: Vec<syn::Ident>,
-    pub fields: Vec<NamedField>,
     pub peek_type: syn::Ident,
+    pub after_each: TokenStream,
 }
 
 impl NamedStructPeek {
-    fn peek(&self, peeker: syn::Type) -> Peek {
-        Peek {
-            peeker,
-            peek_type: self.peek_type.clone(),
+    fn new(input: NamedStructInput) -> Self {
+        let peek_type = format_ident!("__PeekType");
+
+        let mut peek_impl = NamedStructPeek {
+            fn_impl: Default::default(),
+            attrs: input.attrs,
+            name: input.name,
+            where_clause_types: vec![],
+            args: input.args,
+            peek_type,
+            after_each: Default::default(),
+        };
+
+        peek_impl.enrich(input.fields);
+
+        peek_impl
+    }
+
+    fn enrich(&mut self, fields: Vec<NamedField>) {
+        if let Some(ws) = &self.attrs.ignore_whitespace {
+            let ty: syn::Type = match ws {
+                IgnoreWS::Spaces => {
+                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::Space>}).unwrap()
+                }
+                IgnoreWS::All => {
+                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::WhiteSpace>}).unwrap()
+                }
+            };
+            self.where_clause_types.push(ty.clone());
+            self.after_each.extend(self.peek_tokens(&ty))
+        }
+
+        if let Some(prefix) = self.attrs.prefix.clone() {
+            self.add_peek(prefix)
+        }
+
+        for field in fields {
+            let NamedField { attrs, name: _, ty } = field;
+
+            if let Some(prefix) = attrs.prefix {
+                self.add_peek(prefix)
+            }
+
+            let parser = attrs.parser.unwrap_or(ty);
+            self.add_peek(parser);
+
+            if let Some(suffix) = attrs.suffix {
+                self.add_peek(suffix)
+            }
+        }
+
+        if let Some(suffix) = self.attrs.suffix.clone() {
+            self.add_peek(suffix)
+        }
+    }
+
+    fn add_peek(&mut self, peeker: syn::Type) {
+        self.fn_impl.extend(self.peek_tokens(&peeker));
+        self.fn_impl.extend(self.after_each.clone());
+        self.where_clause_types.push(peeker.clone());
+    }
+
+    fn peek_tokens(&self, peeker: &syn::Type) -> TokenStream {
+        let peek_type = &self.peek_type;
+        quote! {
+            if !(<#peeker as ::nommy::Peek<#peek_type>>::peek(input)) { return false }
         }
     }
 }
@@ -131,103 +172,23 @@ impl NamedStructPeek {
 impl ToTokens for NamedStructPeek {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let NamedStructPeek {
-            attrs,
+            fn_impl,
+            attrs: _,
+            after_each: _,
             name,
+            where_clause_types,
             args,
-            fields,
             peek_type,
         } = self;
 
-        let mut impl_args = args.clone();
-        impl_args.push(peek_type.clone());
-        let impl_args = Args(impl_args);
-
-        let args = Args(args.clone());
-
-        let mut where_clause_types = vec![];
-
-        let ignore_whitespace = match &attrs.ignore_whitespace {
-            Some(IgnoreWS::Spaces) => {
-                let ty: syn::Type =
-                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::Space>}).unwrap();
-                where_clause_types.push(ty.clone());
-                self.peek(ty).into_token_stream()
-            }
-            Some(IgnoreWS::All) => {
-                let ty: syn::Type =
-                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::WhiteSpace>}).unwrap();
-                where_clause_types.push(ty.clone());
-                self.peek(ty).into_token_stream()
-            }
-            None => Default::default(),
-        };
-
-        let peek_rows = fields
-            .iter()
-            .map(|field| {
-                let NamedField { attrs, name: _, ty } = field;
-
-                let mut tokens = TokenStream::new();
-
-                if let Some(prefix) = &attrs.prefix {
-                    where_clause_types.push(prefix.clone());
-                    self.peek(prefix.clone()).to_tokens(&mut tokens);
-                    tokens.extend(ignore_whitespace.clone());
-                };
-
-                let parser = attrs.parser.clone().unwrap_or(ty.clone());
-                where_clause_types.push(parser.clone());
-
-                self.peek(parser).to_tokens(&mut tokens);
-                tokens.extend(ignore_whitespace.clone());
-
-                if let Some(suffix) = &attrs.suffix {
-                    where_clause_types.push(suffix.clone());
-                    self.peek(suffix.clone()).to_tokens(&mut tokens);
-                    tokens.extend(ignore_whitespace.clone());
-                };
-
-                tokens
-            })
-            .collect::<Vec<_>>();
-
-        let prefix = match &attrs.prefix {
-            Some(prefix) => {
-                where_clause_types.push(prefix.clone());
-                let mut tokens = self.peek(prefix.clone()).to_token_stream();
-                tokens.extend(ignore_whitespace.clone());
-                tokens
-            }
-            None => Default::default(),
-        };
-
-        let suffix = match &attrs.suffix {
-            Some(suffix) => {
-                where_clause_types.push(suffix.clone());
-                let mut tokens = self.peek(suffix.clone()).to_token_stream();
-                tokens.extend(ignore_whitespace.clone());
-                tokens
-            }
-            None => Default::default(),
-        };
-
-        let peek_where_clause = where_clause_types
-            .iter()
-            .map(|ty| quote! {#ty: ::nommy::Peek<#peek_type>});
-
-        tokens.extend(quote! {
+        tokens.extend(quote!{
             #[automatically_derived]
-            impl #impl_args ::nommy::Peek<#peek_type> for #name #args
+            impl <#peek_type, #(#args),*> ::nommy::Peek<#peek_type> for #name<#(#args),*>
             where #(
-                #peek_where_clause,
+                #where_clause_types: ::nommy::Peek<#peek_type>,
             )* {
                 fn peek(input: &mut ::nommy::Cursor<impl ::std::iter::Iterator<Item=#peek_type>>) -> bool {
-                    #prefix
-
-                    #( #peek_rows )*
-
-                    #suffix
-
+                    #fn_impl
                     true
                 }
             }
@@ -236,20 +197,109 @@ impl ToTokens for NamedStructPeek {
 }
 
 pub struct NamedStructParse {
+    pub fn_impl: TokenStream,
     pub attrs: GlobalAttr,
     pub name: syn::Ident,
+    pub where_clause_types: Vec<syn::Type>,
     pub args: Vec<syn::Ident>,
-    pub fields: Vec<NamedField>,
     pub parse_type: syn::Ident,
+    pub after_each: TokenStream,
 }
 
 impl NamedStructParse {
-    fn parse(&self, parser: syn::Type, error: String) -> Parse {
-        Parse {
-            parser,
-            error,
-            parse_type: self.parse_type.clone(),
-            process: false,
+    fn new(input: NamedStructInput) -> Self {
+        let parse_type = format_ident!("__ParseType");
+
+        let mut parse_impl = NamedStructParse {
+            fn_impl: Default::default(),
+            attrs: input.attrs,
+            name: input.name,
+            where_clause_types: vec![],
+            args: input.args,
+            parse_type,
+            after_each: Default::default(),
+        };
+
+        parse_impl.enrich(input.fields);
+
+        parse_impl
+    }
+
+    fn enrich(&mut self, fields: Vec<NamedField>) {
+        if let Some(ws) = &self.attrs.ignore_whitespace {
+            let ty: syn::Type = match ws {
+                IgnoreWS::Spaces => {
+                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::Space>}).unwrap()
+                }
+                IgnoreWS::All => {
+                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::WhiteSpace>}).unwrap()
+                }
+            };
+            self.where_clause_types.push(ty.clone());
+            self.after_each.extend(self.parse_tokens(
+                &ty,
+                "parsing whitespace should not fail, but did".to_string(),
+                false,
+            ))
+        }
+
+        if let Some(prefix) = self.attrs.prefix.clone() {
+            self.add_parse(prefix, format!("failed to parse prefix for struct `{}`", self.name), false);
+        }
+
+        let mut output = TokenStream::new();
+
+        for field in fields {
+            let NamedField { attrs, name, ty } = field;
+
+            if let Some(prefix) = attrs.prefix.clone() {
+                self.add_parse(prefix, format!("failed to parse prefix for field `{}`", name), false);
+            }
+
+            let parser = attrs.parser.clone().unwrap_or(ty.clone());
+            self.add_let(&name);
+            self.add_parse(parser, format!("could not parse field `{}`", name), attrs.parser.is_some());
+
+            if let Some(suffix) = attrs.suffix.clone() {
+                self.add_parse(suffix, format!("failed to parse suffix for field `{}`", name), false);
+            }
+
+            output.extend(quote!{
+                #name: #name.into(),
+            })
+        }
+
+        if let Some(suffix) = self.attrs.suffix.clone() {
+            self.add_parse(suffix, format!("failed to parse suffix for struct `{}`", self.name), false);
+        }
+
+        let name = &self.name;
+        self.fn_impl.extend(quote!{
+            Ok(#name{#output})
+        })
+    }
+
+    fn add_let(&mut self, name: &syn::Ident) {
+        self.fn_impl.extend(quote!{let #name = });
+    }
+
+    fn add_parse(&mut self, parser: syn::Type, error: String, process: bool) {
+        self.fn_impl
+            .extend(self.parse_tokens(&parser, error, process));
+        self.fn_impl.extend(self.after_each.clone());
+        self.where_clause_types.push(parser.clone());
+    }
+
+    fn parse_tokens(&self, parser: &syn::Type, error: String, process: bool) -> TokenStream {
+        let parse_type = &self.parse_type;
+        if process {
+            quote! {
+                <#parser as ::nommy::Parse<#parse_type>>::parse(input).wrap_err(#error)?.process();
+            }
+        } else {
+            quote! {
+                <#parser as ::nommy::Parse<#parse_type>>::parse(input).wrap_err(#error)?;
+            }
         }
     }
 }
@@ -257,188 +307,26 @@ impl NamedStructParse {
 impl ToTokens for NamedStructParse {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let NamedStructParse {
-            attrs,
+            fn_impl,
+            attrs: _,
+            after_each: _,
             name,
+            where_clause_types,
             args,
-            fields,
             parse_type,
         } = self;
 
-        let mut impl_args = args.clone();
-        impl_args.push(parse_type.clone());
-        let impl_args = Args(impl_args);
-
-        let args = Args(args.clone());
-
-        let mut where_clause_types = vec![];
-
-        let ignore_whitespace = match &attrs.ignore_whitespace {
-            Some(IgnoreWS::Spaces) => {
-                let ty: syn::Type =
-                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::Space>}).unwrap();
-                where_clause_types.push(ty.clone());
-
-                self.parse(ty, "parsing spaces should not fail, but did".to_string())
-                    .into_token_stream()
-            }
-            Some(IgnoreWS::All) => {
-                let ty: syn::Type =
-                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::WhiteSpace>}).unwrap();
-                where_clause_types.push(ty.clone());
-                self.parse(
-                    ty,
-                    "parsing whitespace should not fail, but did".to_string(),
-                )
-                .into_token_stream()
-            }
-            None => Default::default(),
-        };
-
-        let parse_rows = fields
-            .iter()
-            .map(|field| {
-                let NamedField { attrs, name, ty } = field;
-
-                let mut tokens = TokenStream::new();
-
-                if let Some(prefix) = &attrs.prefix {
-                    where_clause_types.push(prefix.clone());
-                    self.parse(
-                        prefix.clone(),
-                        format!("could not parse prefix for field `{}`", name),
-                    )
-                    .to_tokens(&mut tokens);
-                    tokens.extend(ignore_whitespace.clone());
-                };
-
-                let parser = attrs.parser.clone().unwrap_or(ty.clone());
-                where_clause_types.push(parser.clone());
-
-                tokens.extend(quote! {let #name = });
-                self.parse(parser.clone(), format!("could not parse field `{}`", name))
-                    .with_process(attrs.parser.is_some())
-                    .to_tokens(&mut tokens);
-                tokens.extend(ignore_whitespace.clone());
-
-                if let Some(suffix) = &attrs.suffix {
-                    where_clause_types.push(suffix.clone());
-
-                    self.parse(
-                        suffix.clone(),
-                        format!("could not parse suffix for field `{}`", name),
-                    )
-                    .to_tokens(&mut tokens);
-                    tokens.extend(ignore_whitespace.clone());
-                };
-
-                tokens
-            })
-            .collect::<Vec<_>>();
-
-        let create_output_rows = fields.iter().map(|field| {
-            let name = &field.name;
-            quote! {
-                #name: #name.into(),
-            }
-        });
-
-        let prefix = attrs.prefix.clone().map_or(Default::default(), |prefix| {
-            where_clause_types.push(prefix.clone());
-
-            let mut tokens = self
-                .parse(
-                    prefix.clone(),
-                    format!("could not parse prefix for struct `{}`", name),
-                )
-                .into_token_stream();
-            tokens.extend(ignore_whitespace.clone());
-            tokens
-        });
-        let suffix = attrs.suffix.clone().map_or(Default::default(), |suffix| {
-            where_clause_types.push(suffix.clone());
-
-            let mut tokens = self
-                .parse(
-                    suffix.clone(),
-                    format!("could not parse suffix for struct `{}`", name),
-                )
-                .into_token_stream();
-            tokens.extend(ignore_whitespace.clone());
-            tokens
-        });
-
-        let parse_where_clause = where_clause_types
-            .iter()
-            .map(|ty| quote! {#ty: ::nommy::Parse<#parse_type>});
-
-        tokens.extend(quote! {
+        tokens.extend(quote!{
             #[automatically_derived]
-            impl #impl_args ::nommy::Parse<#parse_type> for #name #args
+            impl <#parse_type, #(#args),*> ::nommy::Parse<#parse_type> for #name<#(#args),*>
             where #(
-                #parse_where_clause,
+                #where_clause_types: ::nommy::Parse<#parse_type>,
             )* {
                 fn parse(input: &mut ::nommy::Buffer<impl ::std::iter::Iterator<Item=#parse_type>>) -> ::nommy::eyre::Result<Self> {
                     use ::nommy::eyre::WrapErr;
-
-                    #prefix
-
-                    #( #parse_rows )*
-
-                    #suffix
-
-                    Ok(#name{
-                        #( #create_output_rows )*
-                    })
+                    #fn_impl
                 }
             }
-        })
-    }
-}
-
-struct Peek {
-    pub peeker: syn::Type,
-    pub peek_type: syn::Ident,
-}
-
-impl ToTokens for Peek {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let Peek { peeker, peek_type } = self;
-        tokens.extend(quote! {
-            if !<#peeker as ::nommy::Peek<#peek_type>>::peek(input) { return false }
-        })
-    }
-}
-
-struct Parse {
-    pub parser: syn::Type,
-    pub parse_type: syn::Ident,
-    pub error: String,
-    pub process: bool,
-}
-
-impl Parse {
-    fn with_process(mut self, process: bool) -> Self {
-        self.process = process;
-        self
-    }
-}
-
-impl ToTokens for Parse {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let Parse {
-            parser,
-            parse_type,
-            error,
-            process,
-        } = self;
-
-        let process = if *process {
-            quote! {.process()}
-        } else {
-            quote! {}
-        };
-        tokens.extend(quote! {
-            <#parser as ::nommy::Parse<#parse_type>>::parse(input).wrap_err(#error)?#process;
         })
     }
 }

@@ -7,7 +7,7 @@ mod named_struct;
 mod attr;
 
 use enum_impl::Enum;
-use named_struct::NamedStruct;
+use named_struct::NamedStructInput;
 
 #[proc_macro_derive(Parse, attributes(nommy))]
 pub fn derive_parse(input: TokenStream) -> TokenStream {
@@ -15,7 +15,7 @@ pub fn derive_parse(input: TokenStream) -> TokenStream {
 
     match &input.data {
         syn::Data::Struct(s) => match &s.fields {
-            syn::Fields::Named(named) => NamedStruct::new(&input, named).into_token_stream(),
+            syn::Fields::Named(named) => NamedStructInput::new(&input, named).process().into_token_stream(),
             syn::Fields::Unnamed(_) =>  unimplemented!(),
             syn::Fields::Unit => unimplemented!(),
         },

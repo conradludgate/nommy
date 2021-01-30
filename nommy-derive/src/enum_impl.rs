@@ -3,7 +3,22 @@ use quote::{format_ident, quote, ToTokens};
 
 use crate::attr::FieldAttr;
 
-use super::named_struct::{Args, NamedField};
+use super::named_struct::{NamedField};
+
+pub struct Args(pub Vec<syn::Ident>);
+
+impl ToTokens for Args {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        if self.0.is_empty() {
+            return;
+        }
+        let args = &self.0;
+
+        tokens.extend(quote! {
+            < #( #args ),* >
+        })
+    }
+}
 
 pub struct Enum {
     pub name: syn::Ident,

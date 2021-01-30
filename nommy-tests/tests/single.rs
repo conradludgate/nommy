@@ -11,13 +11,7 @@ fn main() {
 
     let res: Result<Single, _> = parse(".".chars());
     assert_eq!(
-        format!("{:?}", res.unwrap_err()),
-        "could not parse field `only`
-
-Caused by:
-    failed to parse tag \"(\", found \".\"
-
-Location:
-    /home/oon/code/rust/parser-proc-macro/nommy/src/text/tag.rs:35:17"
+        format!("{}", res.unwrap_err()),
+        "could not parse field `only`"
     );
 }

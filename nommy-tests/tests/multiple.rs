@@ -18,25 +18,13 @@ fn main() {
 
     let res: Result<Multiple> = parse(".".chars());
     assert_eq!(
-        format!("{:?}", res.unwrap_err()),
-        "could not parse field `left`
-
-Caused by:
-    failed to parse tag \"(\", found \".\"
-
-Location:
-    /home/oon/code/rust/parser-proc-macro/nommy/src/text/tag.rs:35:17"
+        format!("{}", res.unwrap_err()),
+        "could not parse field `left`"
     );
 
     let res: Result<Multiple> = parse("(.".chars());
     assert_eq!(
-        format!("{:?}", res.unwrap_err()),
-        "could not parse field `right`
-
-Caused by:
-    failed to parse tag \")\", found \".\"
-
-Location:
-    /home/oon/code/rust/parser-proc-macro/nommy/src/text/tag.rs:35:17"
+        format!("{}", res.unwrap_err()),
+        "could not parse field `right`"
     );
 }

@@ -85,6 +85,7 @@ impl ToTokens for NamedStruct {
             name: name.clone(),
             args: args.clone(),
             fields: fields.clone(),
+            peek_type: format_ident!("__PeekType"),
         };
 
         let parse_impl = NamedStructParse {
@@ -92,6 +93,7 @@ impl ToTokens for NamedStruct {
             name: name.clone(),
             args: args.clone(),
             fields: fields.clone(),
+            parse_type: format_ident!("__ParseType"),
         };
 
         tokens.extend(quote! {
@@ -114,6 +116,16 @@ pub struct NamedStructPeek {
     pub name: syn::Ident,
     pub args: Vec<syn::Ident>,
     pub fields: Vec<NamedField>,
+    pub peek_type: syn::Ident,
+}
+
+impl NamedStructPeek {
+    fn peek(&self, peeker: syn::Type) -> Peek {
+        Peek {
+            peeker,
+            peek_type: self.peek_type.clone(),
+        }
+    }
 }
 
 impl ToTokens for NamedStructPeek {
@@ -123,11 +135,11 @@ impl ToTokens for NamedStructPeek {
             name,
             args,
             fields,
+            peek_type,
         } = self;
 
         let mut impl_args = args.clone();
-        let generic_ident = format_ident!("__PeekType");
-        impl_args.push(generic_ident.clone());
+        impl_args.push(peek_type.clone());
         let impl_args = Args(impl_args);
 
         let args = Args(args.clone());
@@ -139,56 +151,40 @@ impl ToTokens for NamedStructPeek {
                 let ty: syn::Type =
                     syn::parse2(quote! {::std::vec::Vec<::nommy::text::Space>}).unwrap();
                 where_clause_types.push(ty.clone());
-                quote! {
-                    <#ty as ::nommy::Peek<#generic_ident>>::peek(input) &&
-                }
+                self.peek(ty).into_token_stream()
             }
             Some(IgnoreWS::All) => {
                 let ty: syn::Type =
                     syn::parse2(quote! {::std::vec::Vec<::nommy::text::WhiteSpace>}).unwrap();
                 where_clause_types.push(ty.clone());
-                quote! {
-                    <#ty as ::nommy::Peek<#generic_ident>>::peek(input) &&
-                }
+                self.peek(ty).into_token_stream()
             }
-            None => quote! {},
+            None => Default::default(),
         };
 
         let peek_rows = fields
             .iter()
-            .enumerate()
-            .map(|(i, field)| {
+            .map(|field| {
                 let NamedField { attrs, name: _, ty } = field;
 
                 let mut tokens = TokenStream::new();
 
-                if i > 0 {
-                    tokens.extend(ignore_whitespace.clone());
-                }
-
                 if let Some(prefix) = &attrs.prefix {
                     where_clause_types.push(prefix.clone());
-                    tokens.extend(quote! {
-                        <#prefix as ::nommy::Peek<#generic_ident>>::peek(input) &&
-                        #ignore_whitespace
-                    });
+                    self.peek(prefix.clone()).to_tokens(&mut tokens);
+                    tokens.extend(ignore_whitespace.clone());
                 };
 
                 let parser = attrs.parser.clone().unwrap_or(ty.clone());
-
                 where_clause_types.push(parser.clone());
 
-                tokens.extend(quote! {
-                    <#parser as ::nommy::Peek<#generic_ident>>::peek(input) &&
-                    #ignore_whitespace
-                });
+                self.peek(parser).to_tokens(&mut tokens);
+                tokens.extend(ignore_whitespace.clone());
 
                 if let Some(suffix) = &attrs.suffix {
                     where_clause_types.push(suffix.clone());
-                    tokens.extend(quote! {
-                        <#suffix as ::nommy::Peek<#generic_ident>>::peek(input) &&
-                        #ignore_whitespace
-                    });
+                    self.peek(suffix.clone()).to_tokens(&mut tokens);
+                    tokens.extend(ignore_whitespace.clone());
                 };
 
                 tokens
@@ -198,36 +194,34 @@ impl ToTokens for NamedStructPeek {
         let prefix = match &attrs.prefix {
             Some(prefix) => {
                 where_clause_types.push(prefix.clone());
-                quote! {
-                    <#prefix as ::nommy::Peek<#generic_ident>>::peek(input) &&
-                    #ignore_whitespace
-                }
+                let mut tokens = self.peek(prefix.clone()).to_token_stream();
+                tokens.extend(ignore_whitespace.clone());
+                tokens
             }
-            None => quote! {},
+            None => Default::default(),
         };
 
         let suffix = match &attrs.suffix {
             Some(suffix) => {
                 where_clause_types.push(suffix.clone());
-                quote! {
-                    <#suffix as ::nommy::Peek<#generic_ident>>::peek(input) &&
-                    #ignore_whitespace
-                }
+                let mut tokens = self.peek(suffix.clone()).to_token_stream();
+                tokens.extend(ignore_whitespace.clone());
+                tokens
             }
-            None => quote! {},
+            None => Default::default(),
         };
 
         let peek_where_clause = where_clause_types
             .iter()
-            .map(|ty| quote! {#ty: ::nommy::Peek<#generic_ident>});
+            .map(|ty| quote! {#ty: ::nommy::Peek<#peek_type>});
 
         tokens.extend(quote! {
             #[automatically_derived]
-            impl #impl_args ::nommy::Peek<#generic_ident> for #name #args
+            impl #impl_args ::nommy::Peek<#peek_type> for #name #args
             where #(
                 #peek_where_clause,
             )* {
-                fn peek(input: &mut ::nommy::Cursor<impl ::std::iter::Iterator<Item=#generic_ident>>) -> bool {
+                fn peek(input: &mut ::nommy::Cursor<impl ::std::iter::Iterator<Item=#peek_type>>) -> bool {
                     #prefix
 
                     #( #peek_rows )*
@@ -246,26 +240,19 @@ pub struct NamedStructParse {
     pub name: syn::Ident,
     pub args: Vec<syn::Ident>,
     pub fields: Vec<NamedField>,
+    pub parse_type: syn::Ident,
 }
 
-// fn is_vec(ty: &syn::Type) -> Option<syn::Type> {
-//     if let syn::Type::Path(p) = &ty {
-//         if p.path.segments.len() == 1 {
-//             let first = p.path.segments.first()?;
-//             if first.ident.to_string() == "Vec" {
-//                 if let syn::PathArguments::AngleBracketed(inner) = &first.arguments {
-//                     if inner.args.len() == 1 {
-//                         let first = inner.args.first()?;
-//                         if let syn::GenericArgument::Type(ty) = first {
-//                             return Some(ty.clone());
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-//     }
-//     None
-// }
+impl NamedStructParse {
+    fn parse(&self, parser: syn::Type, error: String) -> Parse {
+        Parse {
+            parser,
+            error,
+            parse_type: self.parse_type.clone(),
+            process: false,
+        }
+    }
+}
 
 impl ToTokens for NamedStructParse {
     fn to_tokens(&self, tokens: &mut TokenStream) {
@@ -274,11 +261,11 @@ impl ToTokens for NamedStructParse {
             name,
             args,
             fields,
+            parse_type,
         } = self;
 
         let mut impl_args = args.clone();
-        let generic_ident = format_ident!("__ParseType");
-        impl_args.push(generic_ident.clone());
+        impl_args.push(parse_type.clone());
         let impl_args = Args(impl_args);
 
         let args = Args(args.clone());
@@ -290,78 +277,63 @@ impl ToTokens for NamedStructParse {
                 let ty: syn::Type =
                     syn::parse2(quote! {::std::vec::Vec<::nommy::text::Space>}).unwrap();
                 where_clause_types.push(ty.clone());
-                quote! {
-                    <#ty as ::nommy::Parse<#generic_ident>>::parse(input).expect("parsing spaces should not fail, but did");
-                }
+
+                self.parse(ty, "parsing spaces should not fail, but did".to_string())
+                    .into_token_stream()
             }
             Some(IgnoreWS::All) => {
                 let ty: syn::Type =
                     syn::parse2(quote! {::std::vec::Vec<::nommy::text::WhiteSpace>}).unwrap();
                 where_clause_types.push(ty.clone());
-                quote! {
-                    <#ty as ::nommy::Parse<#generic_ident>>::parse(input).expect("parsing whitespace should not fail, but did");
-                }
+                self.parse(
+                    ty,
+                    "parsing whitespace should not fail, but did".to_string(),
+                )
+                .into_token_stream()
             }
-            None => quote! {},
+            None => Default::default(),
         };
 
-        let parse_rows = fields.iter().enumerate().map(|(i, field)| {
-            let NamedField { attrs, name, ty } = field;
-            let error = format!("could not parse field `{}`", name);
+        let parse_rows = fields
+            .iter()
+            .map(|field| {
+                let NamedField { attrs, name, ty } = field;
 
-            let mut tokens = TokenStream::new();
+                let mut tokens = TokenStream::new();
 
-            if i > 0 {
+                if let Some(prefix) = &attrs.prefix {
+                    where_clause_types.push(prefix.clone());
+                    self.parse(
+                        prefix.clone(),
+                        format!("could not parse prefix for field `{}`", name),
+                    )
+                    .to_tokens(&mut tokens);
+                    tokens.extend(ignore_whitespace.clone());
+                };
+
+                let parser = attrs.parser.clone().unwrap_or(ty.clone());
+                where_clause_types.push(parser.clone());
+
+                tokens.extend(quote! {let #name = });
+                self.parse(parser.clone(), format!("could not parse field `{}`", name))
+                    .with_process(attrs.parser.is_some())
+                    .to_tokens(&mut tokens);
                 tokens.extend(ignore_whitespace.clone());
-            }
 
-            if let Some(prefix) = &attrs.prefix {
-                where_clause_types.push(prefix.clone());
-                let error = format!("could not parse prefix for field `{}`", name);
-                tokens.extend(quote! {
-                    <#prefix as ::nommy::Parse<#generic_ident>>::parse(input).wrap_err(#error)?;
-                    #ignore_whitespace
-                });
-            };
+                if let Some(suffix) = &attrs.suffix {
+                    where_clause_types.push(suffix.clone());
 
-            let process = if attrs.parser.is_some() { quote!{.process()} } else { quote!{} };
-            let parser = attrs.parser.clone().unwrap_or(ty.clone());
+                    self.parse(
+                        suffix.clone(),
+                        format!("could not parse suffix for field `{}`", name),
+                    )
+                    .to_tokens(&mut tokens);
+                    tokens.extend(ignore_whitespace.clone());
+                };
 
-            where_clause_types.push(parser.clone());
-
-            // if let Some(parser) = is_vec(&parser) {
-            //     eprintln!("vec parser: {:?}", parser);
-            //     tokens.extend(quote!{
-            //         let #name = {
-            //             let mut output = vec![];
-            //             while <#parser as ::nommy::Peek<#generic_ident>>::peek(&mut input.cursor()) {
-            //                 output.push(
-            //                     <#parser as ::nommy::Parse<#generic_ident>>
-            //                         ::parse(input).expect("peek succeeded but parse failed")#process
-            //                 );
-            //                 #ignore_whitespace
-            //             }
-            //             output
-            //         };
-            //     })
-            // } else {
-                tokens.extend(quote! {
-                    let #name = <#parser as ::nommy::Parse<#generic_ident>>::parse(input).wrap_err(#error)?#process;
-                    #ignore_whitespace
-                });
-            // }
-
-            if let Some(suffix) = &attrs.suffix {
-                where_clause_types.push(suffix.clone());
-                let error = format!("could not parse suffix for field `{}`", name);
-                tokens.extend(quote! {
-                    <#suffix as ::nommy::Parse<#generic_ident>>::parse(input).wrap_err(#error)?;
-                    #ignore_whitespace
-                });
-            };
-
-            tokens
-        }).collect::<Vec<_>>();
+                tokens
+            })
+            .collect::<Vec<_>>();
 
         let create_output_rows = fields.iter().map(|field| {
             let name = &field.name;
@@ -370,41 +342,42 @@ impl ToTokens for NamedStructParse {
             }
         });
 
-        let prefix = match &attrs.prefix {
-            Some(prefix) => {
-                let error = format!("could not parse prefix for struct `{}`", name);
-                where_clause_types.push(prefix.clone());
-                quote! {
-                    <#prefix as ::nommy::Parse<#generic_ident>>::parse(input).wrap_err(#error)?;
-                    #ignore_whitespace
-                }
-            }
-            None => quote! {},
-        };
+        let prefix = attrs.prefix.clone().map_or(Default::default(), |prefix| {
+            where_clause_types.push(prefix.clone());
 
-        let suffix = match &attrs.suffix {
-            Some(suffix) => {
-                let error = format!("could not parse suffix for  `{}`", name);
-                where_clause_types.push(suffix.clone());
-                quote! {
-                    <#suffix as ::nommy::Parse<#generic_ident>>::parse(input).wrap_err(#error)?;
-                    #ignore_whitespace
-                }
-            }
-            None => quote! {},
-        };
+            let mut tokens = self
+                .parse(
+                    prefix.clone(),
+                    format!("could not parse prefix for struct `{}`", name),
+                )
+                .into_token_stream();
+            tokens.extend(ignore_whitespace.clone());
+            tokens
+        });
+        let suffix = attrs.suffix.clone().map_or(Default::default(), |suffix| {
+            where_clause_types.push(suffix.clone());
+
+            let mut tokens = self
+                .parse(
+                    suffix.clone(),
+                    format!("could not parse suffix for struct `{}`", name),
+                )
+                .into_token_stream();
+            tokens.extend(ignore_whitespace.clone());
+            tokens
+        });
 
         let parse_where_clause = where_clause_types
             .iter()
-            .map(|ty| quote! {#ty: ::nommy::Parse<#generic_ident>});
+            .map(|ty| quote! {#ty: ::nommy::Parse<#parse_type>});
 
         tokens.extend(quote! {
             #[automatically_derived]
-            impl #impl_args ::nommy::Parse<#generic_ident> for #name #args
+            impl #impl_args ::nommy::Parse<#parse_type> for #name #args
             where #(
                 #parse_where_clause,
             )* {
-                fn parse(input: &mut ::nommy::Buffer<impl ::std::iter::Iterator<Item=#generic_ident>>) -> ::nommy::eyre::Result<Self> {
+                fn parse(input: &mut ::nommy::Buffer<impl ::std::iter::Iterator<Item=#parse_type>>) -> ::nommy::eyre::Result<Self> {
                     use ::nommy::eyre::WrapErr;
 
                     #prefix
@@ -418,6 +391,54 @@ impl ToTokens for NamedStructParse {
                     })
                 }
             }
+        })
+    }
+}
+
+struct Peek {
+    pub peeker: syn::Type,
+    pub peek_type: syn::Ident,
+}
+
+impl ToTokens for Peek {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let Peek { peeker, peek_type } = self;
+        tokens.extend(quote! {
+            if !<#peeker as ::nommy::Peek<#peek_type>>::peek(input) { return false }
+        })
+    }
+}
+
+struct Parse {
+    pub parser: syn::Type,
+    pub parse_type: syn::Ident,
+    pub error: String,
+    pub process: bool,
+}
+
+impl Parse {
+    fn with_process(mut self, process: bool) -> Self {
+        self.process = process;
+        self
+    }
+}
+
+impl ToTokens for Parse {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let Parse {
+            parser,
+            parse_type,
+            error,
+            process,
+        } = self;
+
+        let process = if *process {
+            quote! {.process()}
+        } else {
+            quote! {}
+        };
+        tokens.extend(quote! {
+            <#parser as ::nommy::Parse<#parse_type>>::parse(input).wrap_err(#error)?#process;
         })
     }
 }

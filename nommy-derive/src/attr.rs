@@ -8,6 +8,16 @@ pub struct GlobalAttr {
 }
 
 impl GlobalAttr {
+    pub fn parse_attrs(attrs: Vec<syn::Attribute>) -> Self {
+        let mut output = GlobalAttr::default();
+        for attr in attrs {
+            if attr.path.is_ident("nommy") {
+                output.parse_attr(attr.tokens);
+            }
+        }
+        output
+    }
+
     pub fn parse_attr(&mut self, tokens: TokenStream) {
         for tt in tokens.into_iter() {
             let inner = match tt {
@@ -141,6 +151,16 @@ pub struct VecFieldAttr {
 }
 
 impl FieldAttr {
+    pub fn parse_attrs(attrs: Vec<syn::Attribute>) -> Self {
+        let mut output = FieldAttr::default();
+        for attr in attrs {
+            if attr.path.is_ident("nommy") {
+                output.parse_attr(attr.tokens);
+            }
+        }
+        output
+    }
+
     pub fn parse_attr(&mut self, tokens: TokenStream) {
         for tt in tokens.into_iter() {
             let inner = match tt {

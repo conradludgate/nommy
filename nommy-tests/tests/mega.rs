@@ -1,4 +1,4 @@
-use nommy::{Parse, Process, parse, text::*};
+use nommy::{Parse, parse, text::*};
 
 type Letters = AnyOf1<"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ">;
 
@@ -109,6 +109,9 @@ fn main() {
             },
         ]
     });
+
+    let v: VariantType = parse("(Bar, Baz)".chars()).unwrap();
+    println!("{:?}", v);
 
     let input = "enum Foo {
         Abc(Bar, Baz),

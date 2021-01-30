@@ -12,41 +12,31 @@ pub struct NamedStructInput {
 }
 
 impl NamedStructInput {
-    pub fn new(derive: &syn::DeriveInput, syn_fields: &syn::FieldsNamed) -> Self {
-        let name = derive.ident.clone();
+    pub fn new(
+        name: syn::Ident,
+        generics: syn::Generics,
+        attrs: Vec<syn::Attribute>,
+        fields: syn::FieldsNamed,
+    ) -> Self {
+        let args = generics.type_params().cloned().map(|tp| tp.ident).collect();
 
-        let args = derive
-            .generics
-            .type_params()
-            .cloned()
-            .map(|tp| tp.ident)
-            .collect();
-
-        let fields = syn_fields
+        let fields = fields
             .named
-            .clone()
             .into_iter()
             .map(|field| {
-                let mut attrs = FieldAttr::default();
-                for attr in &field.attrs {
-                    if attr.path.is_ident("nommy") {
-                        attrs.parse_attr(attr.tokens.clone());
-                    }
-                }
+                let syn::Field {
+                    ident, attrs, ty, ..
+                } = field;
+                let attrs = FieldAttr::parse_attrs(attrs);
                 NamedField {
                     attrs,
-                    name: field.ident.unwrap(),
-                    ty: field.ty,
+                    name: ident.unwrap(),
+                    ty,
                 }
             })
             .collect();
 
-        let mut attrs = GlobalAttr::default();
-        for attr in &derive.attrs {
-            if attr.path.is_ident("nommy") {
-                attrs.parse_attr(attr.tokens.clone());
-            }
-        }
+        let attrs = GlobalAttr::parse_attrs(attrs);
 
         NamedStructInput {
             attrs,
@@ -73,7 +63,7 @@ impl ToTokens for NamedStructOutput {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let NamedStructOutput {
             peek_impl,
-            parse_impl
+            parse_impl,
         } = self;
 
         peek_impl.to_tokens(tokens);
@@ -244,7 +234,11 @@ impl NamedStructParse {
         }
 
         if let Some(prefix) = self.attrs.prefix.clone() {
-            self.add_parse(prefix, format!("failed to parse prefix for struct `{}`", self.name), false);
+            self.add_parse(
+                prefix,
+                format!("failed to parse prefix for struct `{}`", self.name),
+                false,
+            );
         }
 
         let mut output = TokenStream::new();
@@ -253,34 +247,46 @@ impl NamedStructParse {
             let NamedField { attrs, name, ty } = field;
 
             if let Some(prefix) = attrs.prefix.clone() {
-                self.add_parse(prefix, format!("failed to parse prefix for field `{}`", name), false);
+                self.add_parse(
+                    prefix,
+                    format!("failed to parse prefix for field `{}`", name),
+                    false,
+                );
             }
 
             let parser = attrs.parser.clone().unwrap_or(ty.clone());
-            self.add_let(&name);
-            self.add_parse(parser, format!("could not parse field `{}`", name), attrs.parser.is_some());
+            self.fn_impl.extend(quote! {let #name = });
+            self.add_parse(
+                parser,
+                format!("could not parse field `{}`", name),
+                attrs.parser.is_some(),
+            );
 
             if let Some(suffix) = attrs.suffix.clone() {
-                self.add_parse(suffix, format!("failed to parse suffix for field `{}`", name), false);
+                self.add_parse(
+                    suffix,
+                    format!("failed to parse suffix for field `{}`", name),
+                    false,
+                );
             }
 
-            output.extend(quote!{
+            output.extend(quote! {
                 #name: #name.into(),
             })
         }
 
         if let Some(suffix) = self.attrs.suffix.clone() {
-            self.add_parse(suffix, format!("failed to parse suffix for struct `{}`", self.name), false);
+            self.add_parse(
+                suffix,
+                format!("failed to parse suffix for struct `{}`", self.name),
+                false,
+            );
         }
 
         let name = &self.name;
-        self.fn_impl.extend(quote!{
+        self.fn_impl.extend(quote! {
             Ok(#name{#output})
         })
-    }
-
-    fn add_let(&mut self, name: &syn::Ident) {
-        self.fn_impl.extend(quote!{let #name = });
     }
 
     fn add_parse(&mut self, parser: syn::Type, error: String, process: bool) {
@@ -294,7 +300,9 @@ impl NamedStructParse {
         let parse_type = &self.parse_type;
         if process {
             quote! {
-                <#parser as ::nommy::Parse<#parse_type>>::parse(input).wrap_err(#error)?.process();
+                <#parser as ::nommy::Process>::process(
+                    <#parser as ::nommy::Parse<#parse_type>>::parse(input).wrap_err(#error)?
+                );
             }
         } else {
             quote! {

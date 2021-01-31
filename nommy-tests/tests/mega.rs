@@ -66,8 +66,10 @@ struct Variant {
 #[nommy(ignore_whitespace = "all")]
 enum VariantType {
     Struct(#[nommy(prefix = Tag<"{">, suffix = Tag<"}">)] Vec<NamedField>),
-    Tuple(#[nommy(prefix = Tag<"(">, suffix = Tag<"),">)] Vec<UnnamedField>),
-    Unit(Tag<",">),
+    #[nommy(suffix = Tag<",">)]
+    Tuple(#[nommy(prefix = Tag<"(">, suffix = Tag<")">)] Vec<UnnamedField>),
+    #[nommy(suffix = Tag<",">)]
+    Unit,
 }
 
 fn main() {
@@ -153,7 +155,7 @@ fn main() {
                 },
                 Variant {
                     name: "Unit".to_string(),
-                    ty: VariantType::Unit(Tag),
+                    ty: VariantType::Unit,
                 },
             ],
         }

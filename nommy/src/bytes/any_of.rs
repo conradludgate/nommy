@@ -1,34 +1,33 @@
-use std::{convert::Infallible, ops::RangeInclusive};
-
-use text::OneInRange;
-
 use crate::*;
 
 use super::OneOf;
 
 #[derive(Debug, Clone, PartialEq)]
-/// AnyOf is a generic type that implements Parse to match many characters within the given string
+/// AnyOf1 is a generic type that implements Parse to match many characters within the given string
 ///
 /// ```
-/// use nommy::{Parse, Process, Buffer, text::AnyOf};
-/// let mut buffer = Buffer::new("-_-.".chars());
-/// let c = AnyOf::<"-_">::parse(&mut buffer).unwrap();
-/// assert_eq!(c.process(), "-_-");
+/// use nommy::{Parse, Process, Buffer, bytes::AnyOf1};
+/// let mut buffer = Buffer::new("-_-.".bytes());
+/// let c = AnyOf1::<b"-_">::parse(&mut buffer).unwrap();
+/// assert_eq!(c.process(), b"-_-");
 /// ```
-pub struct AnyOf<const CHARS: &'static str>(String);
+pub struct AnyOf1<const BYTES: &'static [u8]>(Vec<u8>);
 
-impl<const CHARS: &'static str> Process for AnyOf<CHARS> {
-    type Output = String;
+impl<const BYTES: &'static [u8]> Process for AnyOf1<BYTES> {
+    type Output = Vec<u8>;
     fn process(self) -> Self::Output {
         self.0
     }
 }
 
-impl<const CHARS: &'static str> Peek<char> for AnyOf<CHARS> {
-    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
+impl<const BYTES: &'static [u8]> Peek<u8> for AnyOf1<BYTES> {
+    fn peek(input: &mut Cursor<impl Iterator<Item = u8>>) -> bool {
+        if !OneOf::<BYTES>::peek(input) {
+            return false;
+        }
         loop {
             let mut cursor = input.cursor();
-            if !OneOf::<CHARS>::peek(&mut cursor) {
+            if !OneOf::<BYTES>::peek(&mut cursor) {
                 break;
             }
             let skip = cursor.close();
@@ -38,98 +37,22 @@ impl<const CHARS: &'static str> Peek<char> for AnyOf<CHARS> {
     }
 }
 
-impl<const CHARS: &'static str> Parse<char> for AnyOf<CHARS> {
-    type Error = Infallible;
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> Result<Self, Self::Error> {
-        let mut output = String::new();
+impl<const BYTES: &'static [u8]> Parse<u8> for AnyOf1<BYTES> {
+    fn parse(input: &mut Buffer<impl Iterator<Item = u8>>) -> eyre::Result<Self> {
+        let mut output = Vec::new();
 
-        while OneOf::<CHARS>::peek(&mut input.cursor()) {
+        while OneOf::<BYTES>::peek(&mut input.cursor()) {
             output.push(
-                OneOf::<CHARS>::parse(input)
+                OneOf::<BYTES>::parse(input)
                     .expect("peek succeeded but parse failed")
                     .process(),
             );
         }
 
-        Ok(AnyOf(output))
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-/// AnyInRange is a generic type that implements Parse to match many characters within the given range
-///
-/// ```
-/// use nommy::{Parse, Process, Buffer, text::AnyInRange};
-/// let mut buffer = Buffer::new("hello world".chars());
-/// let c = AnyInRange::<{'a'..='z'}>::parse(&mut buffer).unwrap();
-/// assert_eq!(c.process(), "hello");
-/// ```
-pub struct AnyInRange<const CHAR_RANGE: RangeInclusive<char>>(String);
-
-impl<const CHAR_RANGE: RangeInclusive<char>> Process for AnyInRange<CHAR_RANGE> {
-    type Output = String;
-    fn process(self) -> Self::Output {
-        self.0
-    }
-}
-
-impl<const CHAR_RANGE: RangeInclusive<char>> Peek<char> for AnyInRange<CHAR_RANGE> {
-    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
-        loop {
-            let mut cursor = input.cursor();
-            if !OneInRange::<CHAR_RANGE>::peek(&mut cursor) {
-                break;
-            }
-            let skip = cursor.close();
-            input.fast_forward(skip);
+        if output.len() == 0 {
+            Err(eyre::eyre!("no characters found"))
+        } else {
+            Ok(AnyOf1(output))
         }
-        true
     }
 }
-
-impl<const CHAR_RANGE: RangeInclusive<char>> Parse<char> for AnyInRange<CHAR_RANGE> {
-    type Error = Infallible;
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> Result<Self, Self::Error> {
-        let mut output = String::new();
-
-        while OneInRange::<CHAR_RANGE>::peek(&mut input.cursor()) {
-            output.push(
-                OneInRange::<CHAR_RANGE>::parse(input)
-                    .expect("peek succeeded but parse failed")
-                    .process(),
-            );
-        }
-
-        Ok(AnyInRange(output))
-    }
-}
-
-/// AnyLowercase parses any length of lower ascii letters
-///
-/// ```
-/// use nommy::{Parse, Process, Buffer, text::AnyLowercase};
-/// let mut buffer = Buffer::new("helloWorld".chars());
-/// let c = AnyLowercase::parse(&mut buffer).unwrap();
-/// assert_eq!(c.process(), "hello");
-/// ```
-pub type AnyLowercase = AnyInRange<{ 'a'..='z' }>;
-
-/// AnyUppercase parses any length of upper ascii letters
-///
-/// ```
-/// use nommy::{Parse, Process, Buffer, text::AnyUppercase};
-/// let mut buffer = Buffer::new("HELLOworld".chars());
-/// let c = AnyUppercase::parse(&mut buffer).unwrap();
-/// assert_eq!(c.process(), "HELLO");
-/// ```
-pub type AnyUppercase = AnyInRange<{ 'A'..='Z' }>;
-
-/// AnyDigits parses any length of ascii digits
-///
-/// ```
-/// use nommy::{Parse, Process, Buffer, text::AnyDigits};
-/// let mut buffer = Buffer::new("1024$".chars());
-/// let c = AnyDigits::parse(&mut buffer).unwrap();
-/// assert_eq!(c.process(), "1024");
-/// ```
-pub type AnyDigits = AnyInRange<{ '0'..='9' }>;

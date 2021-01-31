@@ -33,7 +33,7 @@
 pub mod impls;
 pub mod surrounded;
 // pub mod tuple;
-// pub mod bytes;
+pub mod bytes;
 pub mod text;
 
 use std::collections::VecDeque;

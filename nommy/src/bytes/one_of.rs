@@ -43,17 +43,20 @@ impl<const BYTES: &'static [u8]> Peek<u8> for OneOf<BYTES> {
 }
 
 impl<const BYTES: &'static [u8]> Parse<u8> for OneOf<BYTES> {
-    type Error = OneOfError<BYTES>;
-    fn parse(input: &mut Buffer<impl Iterator<Item = u8>>) -> Result<Self, Self::Error> {
+    fn parse(input: &mut Buffer<impl Iterator<Item = u8>>) -> eyre::Result<Self> {
         match input.next() {
             Some(c) => {
                 if BYTES.contains(&c) {
                     Ok(OneOf(c))
                 } else {
-                    Err(OneOfError(Some(c)))
+                    Err(eyre::eyre!(
+                        "error parsing one of {:?}, found {:?}",
+                        BYTES,
+                        c
+                    ))
                 }
             }
-            None => Err(OneOfError(None)),
+            None => Err(eyre::eyre!("error parsing one of {:?}, reached EOF", BYTES)),
         }
     }
 }
@@ -101,17 +104,16 @@ impl<const BYTE_RANGE: RangeInclusive<u8>> Peek<u8> for OneInRange<BYTE_RANGE> {
 }
 
 impl<const BYTE_RANGE: RangeInclusive<u8>> Parse<u8> for OneInRange<BYTE_RANGE> {
-    type Error = OneInRangeError<BYTE_RANGE>;
-    fn parse(input: &mut Buffer<impl Iterator<Item = u8>>) -> Result<Self, Self::Error> {
+    fn parse(input: &mut Buffer<impl Iterator<Item = u8>>) -> eyre::Result<Self> {
         match input.next() {
             Some(c) => {
                 if BYTE_RANGE.contains(&c) {
                     Ok(OneInRange(c))
                 } else {
-                    Err(OneInRangeError(Some(c)))
+                    Err(eyre::eyre!("could not parse byte in range {:?}, found {:?}", BYTE_RANGE, c))
                 }
             }
-            None => Err(OneInRangeError(None)),
+            None => Err(eyre::eyre!("could not parse byte in range {:?}, reached EOF", BYTE_RANGE)),
         }
     }
 }

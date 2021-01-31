@@ -54,6 +54,60 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf<CHARS> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+/// AnyOf is a generic type that implements Parse to match many characters within the given string
+///
+/// ```
+/// use nommy::{Parse, Process, Buffer, text::AnyOf};
+/// let mut buffer = Buffer::new("-_-.".chars());
+/// let c = AnyOf::<"-_">::parse(&mut buffer).unwrap();
+/// assert_eq!(c.process(), "-_-");
+/// ```
+pub struct WhileNot1<const CHARS: &'static str>(String);
+
+impl<const CHARS: &'static str> Process for WhileNot1<CHARS> {
+    type Output = String;
+    fn process(self) -> Self::Output {
+        self.0
+    }
+}
+
+impl<const CHARS: &'static str> Peek<char> for WhileNot1<CHARS> {
+    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
+        if OneOf::<CHARS>::peek(input) {
+            return false;
+        }
+        loop {
+            let mut cursor = input.cursor();
+            if OneOf::<CHARS>::peek(&mut cursor) {
+                break;
+            }
+            let skip = cursor.close();
+            input.fast_forward(skip);
+        }
+        true
+    }
+}
+
+impl<const CHARS: &'static str> Parse<char> for WhileNot1<CHARS> {
+    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> eyre::Result<Self> {
+        let mut output = String::new();
+
+        while !OneOf::<CHARS>::peek(&mut input.cursor()) {
+            match input.next() {
+                None => break,
+                Some(c) => output.push(c),
+            }
+        }
+
+        if output.len() == 0 {
+            Err(eyre::eyre!("no characters found"))
+        } else {
+            Ok(WhileNot1(output))
+        }
+    }
+}
+
 
 #[derive(Debug, Clone, PartialEq)]
 /// AnyOf1 is a generic type that implements Parse to match many characters within the given string

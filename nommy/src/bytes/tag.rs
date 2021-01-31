@@ -37,12 +37,12 @@ impl<const TAG: &'static [u8]> Peek<u8> for Tag<TAG> {
 }
 
 impl<const TAG: &'static [u8]> Parse<u8> for Tag<TAG> {
-    type Error = TagParseError<TAG>;
-    fn parse(input: &mut Buffer<impl Iterator<Item = u8>>) -> Result<Self, Self::Error> {
-        if TAG.iter().cloned().eq(input.take(TAG.len())) {
+    fn parse(input: &mut Buffer<impl Iterator<Item = u8>>) -> eyre::Result<Self> {
+        let b: Vec<u8> = input.take(TAG.len()).collect();
+        if TAG == &b {
             Ok(Tag)
         } else {
-            Err(TagParseError)
+            Err(eyre::eyre!("failed to parse tag {:?}, found {:?}", TAG, b))
         }
     }
 }
@@ -69,9 +69,9 @@ mod tests {
     #[test]
     fn test_parse_errors() {
         let res: Result<Tag<b"(">, _> = parse("1".bytes());
-        assert_eq!(format!("{}", res.unwrap_err()), "error parsing tag [40]");
+        assert_eq!(format!("{}", res.unwrap_err()), "failed to parse tag [40], found [49]");
 
         let res: Result<Tag<b")">, _> = parse("1".bytes());
-        assert_eq!(format!("{}", res.unwrap_err()), "error parsing tag [41]");
+        assert_eq!(format!("{}", res.unwrap_err()), "failed to parse tag [41], found [49]");
     }
 }

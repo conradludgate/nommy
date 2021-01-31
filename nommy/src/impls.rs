@@ -183,7 +183,7 @@ impl<P: Process, const N: usize> Process for [P; N] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{text::Tag};
+    use crate::text::Tag;
 
     #[test]
     fn option() {
@@ -212,6 +212,16 @@ mod tests {
     }
 
     #[test]
+    fn sequence2_peek() {
+        let mut input = Buffer::new("-...-".chars());
+        let mut cursor = input.cursor();
+
+        assert!(Tag::<"-">::peek(&mut cursor));
+        assert!(Vec::<Tag<".">>::peek(&mut cursor));
+        assert_eq!(cursor.next(), Some('-'));
+    }
+
+    #[test]
     fn count() {
         let _: [Tag<".">; 3] = parse("...".chars()).unwrap();
     }
@@ -231,6 +241,9 @@ mod tests {
     #[test]
     fn sequence_at_least_one_but_none() {
         let res: Result<Vec1<Tag<".">>, _> = parse("-".chars());
-        assert_eq!(format!("{}", res.unwrap_err()), "failed to parse tag \".\", found \"-\"");
+        assert_eq!(
+            format!("{}", res.unwrap_err()),
+            "failed to parse tag \".\", found \"-\""
+        );
     }
 }

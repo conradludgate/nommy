@@ -207,7 +207,7 @@ impl<'a, I: Iterator> Cursor<'a, I> {
     pub fn cursor(&mut self) -> Cursor<I> {
         Cursor {
             buf: self.buf,
-            base: self.index,
+            base: self.index + self.base,
             index: 0,
         }
     }

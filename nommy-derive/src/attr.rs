@@ -3,8 +3,25 @@ use proc_macro2::{Delimiter, TokenStream, TokenTree};
 #[derive(Default, Debug, Clone)]
 pub struct GlobalAttr {
     pub ignore_whitespace: Option<IgnoreWS>,
+    pub debug: bool,
     pub prefix: Option<syn::Type>,
     pub suffix: Option<syn::Type>,
+}
+
+fn parse_type_into(ty: &mut Option<syn::Type>, mut tokens: proc_macro2::token_stream::IntoIter) {
+    match tokens.next() {
+        Some(TokenTree::Punct(p)) => {
+            if p.as_char() != '=' {
+                panic!("expected an '=' to follow")
+            }
+        }
+        _ => panic!("expected an '=' to follow"),
+    }
+
+    let mut stream = TokenStream::new();
+    stream.extend(tokens);
+
+    *ty = Some(syn::parse2(stream).expect("could not parse type"));
 }
 
 impl GlobalAttr {
@@ -63,8 +80,9 @@ impl GlobalAttr {
 
         match ident.to_string().as_ref() {
             "ignore_whitespace" => self.parse_ignore_ws(tokens),
-            "prefix" => self.parse_prefix(tokens),
-            "suffix" => self.parse_suffix(tokens),
+            "prefix" => parse_type_into(&mut self.prefix, tokens),
+            "suffix" => parse_type_into(&mut self.suffix, tokens),
+            "debug" => self.debug = true,
             s => panic!("unknown parameter {}", s),
         }
     }
@@ -93,40 +111,6 @@ impl GlobalAttr {
             }
             _ => panic!("unsupported term. can be \"spaces\" or \"all\"")
         }
-    }
-
-    pub fn parse_prefix(&mut self, mut tokens: proc_macro2::token_stream::IntoIter) {
-        match tokens.next() {
-            Some(TokenTree::Punct(p)) => {
-                if p.as_char() != '=' {
-                    panic!("expected an '=' to follow")
-                }
-            }
-            _ => panic!("expected an '=' to follow"),
-        }
-
-        let mut stream = TokenStream::new();
-        stream.extend(tokens);
-
-        let ty: syn::Type = syn::parse2(stream).expect("could not parse type");
-        self.prefix = Some(ty)
-    }
-
-    pub fn parse_suffix(&mut self, mut tokens: proc_macro2::token_stream::IntoIter) {
-        match tokens.next() {
-            Some(TokenTree::Punct(p)) => {
-                if p.as_char() != '=' {
-                    panic!("expected an '=' to follow")
-                }
-            }
-            _ => panic!("expected an '=' to follow"),
-        }
-
-        let mut stream = TokenStream::new();
-        stream.extend(tokens);
-
-        let ty: syn::Type = syn::parse2(stream).expect("could not parse type");
-        self.suffix = Some(ty)
     }
 }
 
@@ -205,61 +189,10 @@ impl FieldAttr {
         };
 
         match ident.to_string().as_ref() {
-            "prefix" => self.parse_prefix(tokens),
-            "suffix" => self.parse_suffix(tokens),
-            "parser" => self.parse_parser(tokens),
+            "prefix" => parse_type_into(&mut self.prefix, tokens),
+            "suffix" => parse_type_into(&mut self.suffix, tokens),
+            "parser" => parse_type_into(&mut self.parser, tokens),
             s => panic!("unknown parameter {}", s),
         }
-    }
-
-    pub fn parse_prefix(&mut self, mut tokens: proc_macro2::token_stream::IntoIter) {
-        match tokens.next() {
-            Some(TokenTree::Punct(p)) => {
-                if p.as_char() != '=' {
-                    panic!("expected an '=' to follow")
-                }
-            }
-            _ => panic!("expected an '=' to follow"),
-        }
-
-        let mut stream = TokenStream::new();
-        stream.extend(tokens);
-
-        let ty: syn::Type = syn::parse2(stream).expect("could not parse type");
-        self.prefix = Some(ty)
-    }
-
-    pub fn parse_suffix(&mut self, mut tokens: proc_macro2::token_stream::IntoIter) {
-        match tokens.next() {
-            Some(TokenTree::Punct(p)) => {
-                if p.as_char() != '=' {
-                    panic!("expected an '=' to follow")
-                }
-            }
-            _ => panic!("expected an '=' to follow"),
-        }
-
-        let mut stream = TokenStream::new();
-        stream.extend(tokens);
-
-        let ty: syn::Type = syn::parse2(stream).expect("could not parse type");
-        self.suffix = Some(ty)
-    }
-
-    pub fn parse_parser(&mut self, mut tokens: proc_macro2::token_stream::IntoIter) {
-        match tokens.next() {
-            Some(TokenTree::Punct(p)) => {
-                if p.as_char() != '=' {
-                    panic!("expected an '=' to follow")
-                }
-            }
-            _ => panic!("expected an '=' to follow"),
-        }
-
-        let mut stream = TokenStream::new();
-        stream.extend(tokens);
-
-        let ty: syn::Type = syn::parse2(stream).expect("could not parse type");
-        self.parser = Some(ty)
     }
 }

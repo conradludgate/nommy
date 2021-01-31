@@ -12,6 +12,6 @@ fn main() {
     let res: Result<Single, _> = parse(".".chars());
     assert_eq!(
         format!("{}", res.unwrap_err()),
-        "could not parse field `only`"
+        "failed to parse field `only`"
     );
 }

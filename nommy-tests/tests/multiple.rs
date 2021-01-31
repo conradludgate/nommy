@@ -19,12 +19,12 @@ fn main() {
     let res: Result<Multiple> = parse(".".chars());
     assert_eq!(
         format!("{}", res.unwrap_err()),
-        "could not parse field `left`"
+        "failed to parse field `left`"
     );
 
     let res: Result<Multiple> = parse("(.".chars());
     assert_eq!(
         format!("{}", res.unwrap_err()),
-        "could not parse field `right`"
+        "failed to parse field `right`"
     );
 }

@@ -1,7 +1,10 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 
-use crate::{attr::{FieldAttr, GlobalAttr}, parsers::{FieldPeeker, NamedField, NamedFieldParser, UnnamedField, path_from_ident}};
+use crate::{
+    attr::{FieldAttr, GlobalAttr},
+    parsers::{FunctionBuilder, NamedField, Parser, Peeker},
+};
 
 #[derive(Clone)]
 pub struct NamedStructInput {
@@ -95,26 +98,27 @@ impl NamedStructPeek {
             after_each: Default::default(),
         };
 
-        peek_impl.enrich(input.fields);
+        peek_impl.enrich(&input.fields);
 
         peek_impl
     }
 
-    fn enrich(&mut self, fields: Vec<NamedField>) {
-        self.fn_impl.extend(
-            FieldPeeker {
-                attrs: &self.attrs,
-                peek_type: &self.peek_type,
-                fields: fields
-                    .into_iter()
-                    .map(|field| {
-                        let NamedField { attrs, name: _, ty } = field;
-                        UnnamedField { attrs, ty }
-                    })
-                    .collect(),
-            }
-            .to_tokens(&mut self.where_clause_types),
+    fn enrich(&mut self, fields: &Vec<NamedField>) {
+        let mut builder = FunctionBuilder::<Peeker>::new(
+            &mut self.where_clause_types,
+            &self.peek_type,
+            &self.attrs.ignore_whitespace,
         );
+
+        self.fn_impl
+            .extend(builder.fix(&self.attrs.prefix, "prefix", ""));
+
+        for (i, field) in fields.iter().enumerate() {
+            self.fn_impl.extend(builder.field(field, i))
+        }
+
+        self.fn_impl
+            .extend(builder.fix(&self.attrs.suffix, "suffix", ""));
     }
 }
 
@@ -122,7 +126,7 @@ impl ToTokens for NamedStructPeek {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let NamedStructPeek {
             fn_impl,
-            attrs: _,
+            attrs,
             after_each: _,
             name,
             where_clause_types,
@@ -130,18 +134,38 @@ impl ToTokens for NamedStructPeek {
             peek_type,
         } = self;
 
-        tokens.extend(quote!{
-            #[automatically_derived]
-            impl <#peek_type, #(#args),*> ::nommy::Peek<#peek_type> for #name<#(#args),*>
-            where #(
-                #where_clause_types: ::nommy::Peek<#peek_type>,
-            )* {
-                fn peek(input: &mut ::nommy::Cursor<impl ::std::iter::Iterator<Item=#peek_type>>) -> bool {
-                    #fn_impl
-                    true
+        if attrs.debug {
+            let struct_name = name.to_string();
+            tokens.extend(quote!{
+                #[automatically_derived]
+                impl <#peek_type: Clone + ::std::fmt::Debug, #(#args),*> ::nommy::Peek<#peek_type> for #name<#(#args),*>
+                where #(
+                    #where_clause_types: ::nommy::Peek<#peek_type>,
+                )* {
+                    fn peek(input: &mut ::nommy::Cursor<impl ::std::iter::Iterator<Item=#peek_type>>) -> bool {
+                        {
+                            println!("peeking `{}` with input starting with {:?}", #struct_name, input.cursor().collect::<Vec<_>>());
+                        }
+
+                        #fn_impl
+                        true
+                    }
                 }
-            }
-        })
+            })
+        } else {
+            tokens.extend(quote!{
+                #[automatically_derived]
+                impl <#peek_type, #(#args),*> ::nommy::Peek<#peek_type> for #name<#(#args),*>
+                where #(
+                    #where_clause_types: ::nommy::Peek<#peek_type>,
+                )* {
+                    fn peek(input: &mut ::nommy::Cursor<impl ::std::iter::Iterator<Item=#peek_type>>) -> bool {
+                        #fn_impl
+                        true
+                    }
+                }
+            })
+        }
     }
 }
 
@@ -175,15 +199,35 @@ impl NamedStructParse {
     }
 
     fn enrich(&mut self, fields: Vec<NamedField>) {
-        self.fn_impl.extend(
-            NamedFieldParser {
-                struct_path: path_from_ident(self.name.clone()),
-                attrs: &self.attrs,
-                parse_type: &self.parse_type,
-                fields,
-            }
-            .to_tokens(&mut self.where_clause_types),
+        let mut builder = FunctionBuilder::<Parser>::new(
+            &mut self.where_clause_types,
+            &self.parse_type,
+            &self.attrs.ignore_whitespace,
         );
+
+        self.fn_impl.extend(builder.fix(
+            &self.attrs.prefix,
+            "prefix",
+            format!("struct `{}`", self.name),
+        ));
+
+        for (i, field) in fields.iter().enumerate() {
+            self.fn_impl.extend(builder.field(field, i))
+        }
+
+        self.fn_impl.extend(builder.fix(
+            &self.attrs.suffix,
+            "suffix",
+            format!("struct `{}`", self.name),
+        ));
+
+        let name = &self.name;
+        let names = fields.iter().map(|f| &f.name);
+        self.fn_impl.extend(quote! {
+            Ok(#name {#(
+                #names: #names.into(),
+            )*})
+        })
     }
 }
 
@@ -191,7 +235,7 @@ impl ToTokens for NamedStructParse {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let NamedStructParse {
             fn_impl,
-            attrs: _,
+            attrs,
             after_each: _,
             name,
             where_clause_types,
@@ -199,17 +243,38 @@ impl ToTokens for NamedStructParse {
             parse_type,
         } = self;
 
-        tokens.extend(quote!{
-            #[automatically_derived]
-            impl <#parse_type, #(#args),*> ::nommy::Parse<#parse_type> for #name<#(#args),*>
-            where #(
-                #where_clause_types: ::nommy::Parse<#parse_type>,
-            )* {
-                fn parse(input: &mut ::nommy::Buffer<impl ::std::iter::Iterator<Item=#parse_type>>) -> ::nommy::eyre::Result<Self> {
-                    use ::nommy::eyre::WrapErr;
-                    #fn_impl
+        if attrs.debug {
+            let struct_name = name.to_string();
+            tokens.extend(quote!{
+                #[automatically_derived]
+                impl <#parse_type: Clone + ::std::fmt::Debug, #(#args),*> ::nommy::Parse<#parse_type> for #name<#(#args),*>
+                where #(
+                    #where_clause_types: ::nommy::Parse<#parse_type>,
+                )* {
+                    fn parse(input: &mut ::nommy::Buffer<impl ::std::iter::Iterator<Item=#parse_type>>) -> ::nommy::eyre::Result<Self> {
+                        use ::nommy::eyre::WrapErr;
+
+                        {
+                            println!("parsing `{}` with input starting with {:?}", #struct_name, input.cursor().collect::<Vec<_>>());
+                        }
+
+                        #fn_impl
+                    }
                 }
-            }
-        })
+            });
+        } else {
+            tokens.extend(quote!{
+                #[automatically_derived]
+                impl <#parse_type, #(#args),*> ::nommy::Parse<#parse_type> for #name<#(#args),*>
+                where #(
+                    #where_clause_types: ::nommy::Parse<#parse_type>,
+                )* {
+                    fn parse(input: &mut ::nommy::Buffer<impl ::std::iter::Iterator<Item=#parse_type>>) -> ::nommy::eyre::Result<Self> {
+                        use ::nommy::eyre::WrapErr;
+                        #fn_impl
+                    }
+                }
+            })
+        }
     }
 }

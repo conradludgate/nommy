@@ -57,6 +57,21 @@ mod tests {
     }
 
     #[test]
+    fn test_peek_matches() {
+        let mut input = Buffer::new("(){}[]<>".chars());
+        let mut cursor = input.cursor();
+        assert!(Tag::<"(">::peek(&mut cursor));
+        assert!(Tag::<")">::peek(&mut cursor));
+        assert!(Tag::<"{">::peek(&mut cursor));
+        assert!(Tag::<"}">::peek(&mut cursor));
+        assert!(Tag::<"[">::peek(&mut cursor));
+        assert!(Tag::<"]">::peek(&mut cursor));
+        assert!(Tag::<"<">::peek(&mut cursor));
+        assert!(Tag::<">">::peek(&mut cursor));
+        assert!(cursor.next().is_none())
+    }
+
+    #[test]
     fn test_parse_errors() {
         let res: Result<Tag<"(">, _> = parse("1".chars());
         assert_eq!(format!("{}", res.unwrap_err()), "failed to parse tag \"(\", found \"1\"");

@@ -3,10 +3,7 @@ use quote::{format_ident, quote, ToTokens};
 
 use crate::{
     attr::{FieldAttr, GlobalAttr},
-    parsers::{
-        path_from_idents, FieldPeeker, NamedField, NamedFieldParser, UnnamedField,
-        UnnamedFieldParser,
-    },
+    parsers::{FieldType, FunctionBuilder, NamedField, Parser, Peeker, UnnamedField},
 };
 
 #[derive(Clone)]
@@ -160,39 +157,30 @@ impl EnumPeek {
 
             self.peek_fn_names.push(peek);
             match field.field_type {
-                EnumFieldType::Named(named) => self.add_struct_peek(named),
-                EnumFieldType::Tuple(unnamed) => self.add_tuple_peek(unnamed),
+                EnumFieldType::Named(named) => self.add_peek(&named),
+                EnumFieldType::Tuple(unnamed) => self.add_peek(&unnamed),
             }
         }
         self.fn_impl.extend(quote! {{ return false; }});
     }
 
-    fn add_struct_peek(&mut self, named: Vec<NamedField>) {
-        self.peek_fn_impl.push(
-            FieldPeeker {
-                attrs: &self.attrs,
-                peek_type: &self.peek_type,
-                fields: named
-                    .into_iter()
-                    .map(|field| {
-                        let NamedField { attrs, name: _, ty } = field;
-                        UnnamedField { attrs, ty }
-                    })
-                    .collect(),
-            }
-            .to_tokens(&mut self.where_clause_types),
+    fn add_peek(&mut self, named: &Vec<impl FieldType>) {
+        let mut tokens = TokenStream::new();
+        let mut builder = FunctionBuilder::<Peeker>::new(
+            &mut self.where_clause_types,
+            &self.peek_type,
+            &self.attrs.ignore_whitespace,
         );
-    }
 
-    fn add_tuple_peek(&mut self, unnamed: Vec<UnnamedField>) {
-        self.peek_fn_impl.push(
-            FieldPeeker {
-                attrs: &self.attrs,
-                peek_type: &self.peek_type,
-                fields: unnamed,
-            }
-            .to_tokens(&mut self.where_clause_types),
-        );
+        tokens.extend(builder.fix(&self.attrs.prefix, "prefix", ""));
+
+        for (i, field) in named.iter().enumerate() {
+            tokens.extend(builder.field(field, i))
+        }
+
+        tokens.extend(builder.fix(&self.attrs.suffix, "suffix", ""));
+
+        self.peek_fn_impl.push(tokens);
     }
 }
 
@@ -281,34 +269,58 @@ impl EnumParse {
 
             self.parse_fn_names.push(parse);
             match field.field_type {
-                EnumFieldType::Named(named) => self.add_struct_parse(field.name, named),
-                EnumFieldType::Tuple(unnamed) => self.add_tuple_parse(field.name, unnamed),
+                EnumFieldType::Named(named) => self.add_parse("struct", &field.name, &named),
+                EnumFieldType::Tuple(unnamed) => self.add_parse("tuple", &field.name, &unnamed),
             }
         }
     }
 
-    fn add_struct_parse(&mut self, variant_name: syn::Ident, named: Vec<NamedField>) {
-        self.parse_fn_impl.push(
-            NamedFieldParser {
-                struct_path: path_from_idents(vec![self.name.clone(), variant_name]),
-                attrs: &self.attrs,
-                parse_type: &self.parse_type,
-                fields: named,
-            }
-            .to_tokens(&mut self.where_clause_types),
+    fn add_parse(
+        &mut self,
+        type_name: &'static str,
+        variant_name: &syn::Ident,
+        fields: &Vec<impl FieldType>,
+    ) {
+        let mut tokens = TokenStream::new();
+        let mut builder = FunctionBuilder::<Parser>::new(
+            &mut self.where_clause_types,
+            &self.parse_type,
+            &self.attrs.ignore_whitespace,
         );
-    }
 
-    fn add_tuple_parse(&mut self, variant_name: syn::Ident, unnamed: Vec<UnnamedField>) {
-        self.parse_fn_impl.push(
-            UnnamedFieldParser {
-                tuple_path: path_from_idents(vec![self.name.clone(), variant_name]),
-                attrs: &self.attrs,
-                parse_type: &self.parse_type,
-                fields: unnamed,
-            }
-            .to_tokens(&mut self.where_clause_types),
-        );
+        tokens.extend(builder.fix(
+            &self.attrs.prefix,
+            "prefix",
+            format!("{} `{}::{}`", type_name, self.name, variant_name),
+        ));
+
+        for (i, field) in fields.iter().enumerate() {
+            tokens.extend(builder.field(field, i))
+        }
+
+        tokens.extend(builder.fix(
+            &self.attrs.suffix,
+            "suffix",
+            format!("struct `{}::{}`", self.name, variant_name),
+        ));
+
+        let name = &self.name;
+        let names = fields.iter().enumerate().map(|(i, f)| f.name(i));
+        if type_name == "tuple" {
+            tokens.extend(quote!{
+                Ok(#name::#variant_name (#(
+                    #names.into(),
+                )*))
+            });
+        } else {
+            tokens.extend(quote!{
+                Ok(#name::#variant_name {#(
+                    #names: #names.into(),
+                )*})
+            });
+        }
+
+        self.parse_fn_impl.push(tokens);
     }
 }
 

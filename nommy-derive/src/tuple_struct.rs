@@ -1,11 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 
-use crate::{
-    attr::{FieldAttr, GlobalAttr},
-    parsers::UnnamedField,
-    parsers::{path_from_ident, FieldPeeker, UnnamedFieldParser},
-};
+use crate::{attr::{FieldAttr, GlobalAttr}, parsers::{FieldType, FunctionBuilder, Parser, Peeker, UnnamedField}};
 
 #[derive(Clone)]
 pub struct TupleStructInput {
@@ -106,14 +102,21 @@ impl TupleStructPeek {
     }
 
     fn enrich(&mut self, fields: Vec<UnnamedField>) {
-        self.fn_impl.extend(
-            FieldPeeker {
-                attrs: &self.attrs,
-                peek_type: &self.peek_type,
-                fields,
-            }
-            .to_tokens(&mut self.where_clause_types),
+        let mut builder = FunctionBuilder::<Peeker>::new(
+            &mut self.where_clause_types,
+            &self.peek_type,
+            &self.attrs.ignore_whitespace,
         );
+
+        self.fn_impl
+            .extend(builder.fix(&self.attrs.prefix, "prefix", ""));
+
+        for (i, field) in fields.iter().enumerate() {
+            self.fn_impl.extend(builder.field(field, i))
+        }
+
+        self.fn_impl
+            .extend(builder.fix(&self.attrs.suffix, "suffix", ""));
     }
 }
 
@@ -174,15 +177,35 @@ impl TupleStructParse {
     }
 
     fn enrich(&mut self, fields: Vec<UnnamedField>) {
-        self.fn_impl.extend(
-            UnnamedFieldParser {
-                tuple_path: path_from_ident(self.name.clone()),
-                attrs: &self.attrs,
-                parse_type: &self.parse_type,
-                fields,
-            }
-            .to_tokens(&mut self.where_clause_types),
+        let mut builder = FunctionBuilder::<Parser>::new(
+            &mut self.where_clause_types,
+            &self.parse_type,
+            &self.attrs.ignore_whitespace,
         );
+
+        self.fn_impl.extend(builder.fix(
+            &self.attrs.prefix,
+            "prefix",
+            format!("tuple `{}`", self.name),
+        ));
+
+        for (i, field) in fields.iter().enumerate() {
+            self.fn_impl.extend(builder.field(field, i))
+        }
+
+        self.fn_impl.extend(builder.fix(
+            &self.attrs.suffix,
+            "suffix",
+            format!("tuple `{}`", self.name),
+        ));
+
+        let name = &self.name;
+        let names = fields.iter().enumerate().map(|(i, f)| f.name(i));
+        self.fn_impl.extend(quote!{
+            Ok(#name (#(
+                #names.into(),
+            )*))
+        })
     }
 }
 

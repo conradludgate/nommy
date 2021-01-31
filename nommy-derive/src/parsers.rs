@@ -1,7 +1,9 @@
-use proc_macro2::TokenStream;
-use quote::{format_ident, quote, ToTokens};
+use std::marker::PhantomData;
 
-use crate::attr::{FieldAttr, GlobalAttr, IgnoreWS};
+use proc_macro2::TokenStream;
+use quote::{format_ident, quote};
+
+use crate::attr::{FieldAttr, IgnoreWS};
 
 #[derive(Debug, Clone)]
 pub struct NamedField {
@@ -16,370 +18,173 @@ pub struct UnnamedField {
     pub ty: syn::Type,
 }
 
-struct Peeker<'a> {
-    pub peek_type: &'a syn::Ident,
+pub trait FieldType {
+    fn ty(&self) -> &syn::Type;
+    fn name(&self, i: usize) -> syn::Ident;
+    fn attrs(&self) -> &FieldAttr;
 }
 
-impl<'a> Peeker<'a> {
-    pub fn peek(
-        &self,
-        wc: &'a mut Vec<syn::Type>,
-        tokens: &mut TokenStream,
-        after_each: TokenStream,
-        peeker: &syn::Type,
-    ) {
-        wc.push(peeker.clone());
-        tokens.extend(self.peek_tokens(&peeker));
-        tokens.extend(after_each.clone());
+impl FieldType for NamedField {
+    fn ty(&self) -> &syn::Type {
+        &self.ty
     }
-
-    fn peek_tokens(&self, peeker: &syn::Type) -> TokenStream {
-        let peek_type = &self.peek_type;
-        quote! {
-            if !(<#peeker as ::nommy::Peek<#peek_type>>::peek(input)) { return false }
-        }
+    fn name(&self, _: usize) -> syn::Ident {
+        self.name.clone()
+    }
+    fn attrs(&self) -> &FieldAttr {
+        &self.attrs
     }
 }
 
-pub struct FieldPeeker<'a> {
-    pub attrs: &'a GlobalAttr,
-    pub peek_type: &'a syn::Ident,
-    pub fields: Vec<UnnamedField>,
-}
-
-impl<'a> FieldPeeker<'a> {
-    pub fn to_tokens(&self, wc: &'a mut Vec<syn::Type>) -> TokenStream {
-        let peek_tokens = Peeker {
-            peek_type: self.peek_type,
-        };
-
-        let mut after_each = TokenStream::new();
-        if let Some(ws) = &self.attrs.ignore_whitespace {
-            let ty: syn::Type = match ws {
-                IgnoreWS::Spaces => {
-                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::Space>}).unwrap()
-                }
-                IgnoreWS::All => {
-                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::WhiteSpace>}).unwrap()
-                }
-            };
-            peek_tokens.peek(wc, &mut after_each, Default::default(), &ty);
-        }
-
-        let mut tokens = TokenStream::new();
-
-        if let Some(prefix) = self.attrs.prefix.clone() {
-            peek_tokens.peek(wc, &mut tokens, after_each.clone(), &prefix);
-        }
-
-        for field in &self.fields {
-            let UnnamedField { attrs, ty } = field;
-
-            if let Some(prefix) = &attrs.prefix {
-                peek_tokens.peek(wc, &mut tokens, after_each.clone(), &prefix);
-            }
-
-            let parser = match &attrs.parser {
-                Some(p) => p,
-                None => ty,
-            };
-            peek_tokens.peek(wc, &mut tokens, after_each.clone(), &parser);
-
-            if let Some(suffix) = &attrs.suffix {
-                peek_tokens.peek(wc, &mut tokens, after_each.clone(), &suffix);
-            }
-        }
-
-        if let Some(suffix) = self.attrs.suffix.clone() {
-            peek_tokens.peek(wc, &mut tokens, after_each.clone(), &suffix);
-        }
-
-        tokens
+impl FieldType for UnnamedField {
+    fn ty(&self) -> &syn::Type {
+        &self.ty
+    }
+    fn name(&self, i: usize) -> syn::Ident {
+        format_ident!("elem{}", i)
+    }
+    fn attrs(&self) -> &FieldAttr {
+        &self.attrs
     }
 }
 
-struct Parser<'a> {
-    pub parse_type: &'a syn::Ident,
-}
-
-impl<'a> Parser<'a> {
-    pub fn parse(
-        &self,
-        wc: &'a mut Vec<syn::Type>,
-        tokens: &mut TokenStream,
-        after_each: TokenStream,
-        parser: syn::Type,
-        error: String,
+pub trait PTokens {
+    const ASSIGN: bool;
+    fn tokens(
+        ty: &syn::Type,
+        generic: &syn::Ident,
+        error: impl AsRef<str>,
         process: bool,
-    ) {
-        wc.push(parser.clone());
-        tokens.extend(self.parse_tokens(&parser, error, process));
-        tokens.extend(after_each.clone());
-    }
+    ) -> TokenStream;
+}
 
-    fn parse_tokens(&self, parser: &syn::Type, error: String, process: bool) -> TokenStream {
-        let parse_type = &self.parse_type;
+pub struct Parser;
+impl PTokens for Parser {
+    const ASSIGN: bool = true;
+    fn tokens(
+        ty: &syn::Type,
+        generic: &syn::Ident,
+        error: impl AsRef<str>,
+        process: bool,
+    ) -> TokenStream {
+        let error = error.as_ref();
         if process {
             quote! {
-                <#parser as ::nommy::Process>::process(
-                    <#parser as ::nommy::Parse<#parse_type>>::parse(input).wrap_err(#error)?
+                <#ty as ::nommy::Process>::process(
+                    <#ty as ::nommy::Parse<#generic>>::parse(input).wrap_err(#error)?
                 );
             }
         } else {
             quote! {
-                <#parser as ::nommy::Parse<#parse_type>>::parse(input).wrap_err(#error)?;
+                <#ty as ::nommy::Parse<#generic>>::parse(input).wrap_err(#error)?;
             }
         }
     }
 }
 
-pub struct NamedFieldParser<'a> {
-    pub struct_path: syn::Path,
-    pub attrs: &'a GlobalAttr,
-    pub parse_type: &'a syn::Ident,
-    pub fields: Vec<NamedField>,
+pub struct Peeker;
+impl PTokens for Peeker {
+    const ASSIGN: bool = false;
+    fn tokens(ty: &syn::Type, generic: &syn::Ident, _: impl AsRef<str>, _: bool) -> TokenStream {
+        quote! {
+            if !(<#ty as ::nommy::Peek<#generic>>::peek(input)) { return false }
+        }
+    }
 }
 
-impl<'a> NamedFieldParser<'a> {
-    pub fn to_tokens(&self, wc: &'a mut Vec<syn::Type>) -> TokenStream {
-        let parse_tokens = Parser {
-            parse_type: self.parse_type,
+pub struct FunctionBuilder<'a, P: PTokens> {
+    pub wc: &'a mut Vec<syn::Type>,
+    pub generic: &'a syn::Ident,
+    after_each: TokenStream,
+    _phantom: PhantomData<P>,
+}
+
+impl<'a, P: PTokens> FunctionBuilder<'a, P> {
+    pub fn new(
+        wc: &'a mut Vec<syn::Type>,
+        generic: &'a syn::Ident,
+        ignore_ws: &Option<IgnoreWS>,
+    ) -> Self {
+        let after_each = match &ignore_ws {
+            Some(ws) => {
+                let ty: syn::Type = match ws {
+                    IgnoreWS::Spaces => {
+                        syn::parse2(quote! {::std::vec::Vec<::nommy::text::Space>}).unwrap()
+                    }
+                    IgnoreWS::All => {
+                        syn::parse2(quote! {::std::vec::Vec<::nommy::text::WhiteSpace>}).unwrap()
+                    }
+                };
+                wc.push(ty.clone());
+                P::tokens(
+                    &ty,
+                    &generic,
+                    "parsing whitespace should not fail, but did",
+                    false,
+                )
+            }
+            None => Default::default(),
         };
+
+        FunctionBuilder {
+            wc,
+            generic,
+            after_each,
+            _phantom: PhantomData,
+        }
+    }
+
+    // prefix or suffix
+    pub fn fix(
+        &mut self,
+        fix: &Option<syn::Type>,
+        fix_type: &'static str,
+        type_name: impl AsRef<str>,
+    ) -> TokenStream {
+        match fix {
+            Some(prefix) => {
+                self.wc.push(prefix.clone());
+                let mut tokens = P::tokens(
+                    &prefix,
+                    &self.generic,
+                    format!("failed to parse {} for {}", fix_type, type_name.as_ref()),
+                    false,
+                );
+                tokens.extend(self.after_each.clone());
+                tokens
+            }
+            None => Default::default(),
+        }
+    }
+
+    // prefix or suffix
+    pub fn field<F: FieldType>(&mut self, field: &F, field_num: usize) -> TokenStream {
+        let ty = field.ty();
+        let name = field.name(field_num);
+        let attrs = field.attrs();
 
         let mut tokens = TokenStream::new();
 
-        let mut after_each = TokenStream::new();
-        if let Some(ws) = &self.attrs.ignore_whitespace {
-            let ty: syn::Type = match ws {
-                IgnoreWS::Spaces => {
-                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::Space>}).unwrap()
-                }
-                IgnoreWS::All => {
-                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::WhiteSpace>}).unwrap()
-                }
-            };
-            parse_tokens.parse(
-                wc,
-                &mut after_each,
-                Default::default(),
-                ty,
-                "parsing whitespace should not fail, but did".to_string(),
-                false,
-            );
+        tokens.extend(self.fix(&attrs.prefix, "prefix", format!("field `{}`", name)));
+
+        if P::ASSIGN {
+            tokens.extend(quote! { let #name = });
         }
-
-        let struct_path = self.struct_path.clone().into_token_stream();
-
-        if let Some(prefix) = self.attrs.prefix.clone() {
-            parse_tokens.parse(
-                wc,
-                &mut tokens,
-                after_each.clone(),
-                prefix,
-                format!("failed to parse prefix for struct `{}`", struct_path),
-                false,
-            );
-        }
-
-        let mut output = TokenStream::new();
-
-        for field in &self.fields {
-            let NamedField { attrs, name, ty } = field;
-
-            if let Some(prefix) = attrs.prefix.clone() {
-                parse_tokens.parse(
-                    wc,
-                    &mut tokens,
-                    after_each.clone(),
-                    prefix,
-                    format!("failed to parse prefix for field `{}`", name),
-                    false,
-                );
-            }
-
-            let parser = match &attrs.parser {
-                Some(p) => p,
-                None => ty,
-            };
-            tokens.extend(quote! {let #name = });
-            parse_tokens.parse(
-                wc,
-                &mut tokens,
-                after_each.clone(),
-                parser.clone(),
-                format!("could not parse field `{}`", name),
-                attrs.parser.is_some(),
-            );
-
-            if let Some(suffix) = attrs.suffix.clone() {
-                parse_tokens.parse(
-                    wc,
-                    &mut tokens,
-                    after_each.clone(),
-                    suffix,
-                    format!("failed to parse suffix for field `{}`", name),
-                    false,
-                );
-            }
-
-            output.extend(quote! { #name: #name.into(), })
-        }
-
-        if let Some(suffix) = self.attrs.suffix.clone() {
-            parse_tokens.parse(
-                wc,
-                &mut tokens,
-                after_each.clone(),
-                suffix,
-                format!("failed to parse suffix for struct `{}`", struct_path),
-                false,
-            );
-        }
-
-        tokens.extend(quote! {
-            Ok(#struct_path{#output})
-        });
-
-        tokens
-    }
-}
-
-pub struct UnnamedFieldParser<'a> {
-    pub tuple_path: syn::Path,
-    pub attrs: &'a GlobalAttr,
-    pub parse_type: &'a syn::Ident,
-    pub fields: Vec<UnnamedField>,
-}
-
-impl<'a> UnnamedFieldParser<'a> {
-    pub fn to_tokens(&self, wc: &'a mut Vec<syn::Type>) -> TokenStream {
-        let parse_tokens = Parser {
-            parse_type: self.parse_type,
+        let (parser, process) = match &attrs.parser {
+            Some(p) => (p, true),
+            None => (ty, false),
         };
+        self.wc.push(parser.clone());
+        tokens.extend(P::tokens(
+            &parser,
+            &self.generic,
+            format!("failed to parse field `{}`", name),
+            process,
+        ));
+        tokens.extend(self.after_each.clone());
 
-        let mut tokens = TokenStream::new();
-
-        let mut after_each = TokenStream::new();
-        if let Some(ws) = &self.attrs.ignore_whitespace {
-            let ty: syn::Type = match ws {
-                IgnoreWS::Spaces => {
-                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::Space>}).unwrap()
-                }
-                IgnoreWS::All => {
-                    syn::parse2(quote! {::std::vec::Vec<::nommy::text::WhiteSpace>}).unwrap()
-                }
-            };
-            parse_tokens.parse(
-                wc,
-                &mut after_each,
-                Default::default(),
-                ty,
-                "parsing whitespace should not fail, but did".to_string(),
-                false,
-            );
-        }
-
-        let tuple_path = self.tuple_path.clone().into_token_stream();
-
-        if let Some(prefix) = self.attrs.prefix.clone() {
-            parse_tokens.parse(
-                wc,
-                &mut tokens,
-                after_each.clone(),
-                prefix,
-                format!("failed to parse prefix for tuple `{}`", tuple_path),
-                false,
-            );
-        }
-
-        let mut output = TokenStream::new();
-
-        for (i, field) in self.fields.iter().enumerate() {
-            let UnnamedField { attrs, ty } = field;
-            let name = format_ident!("field{}", i);
-
-            if let Some(prefix) = attrs.prefix.clone() {
-                parse_tokens.parse(
-                    wc,
-                    &mut tokens,
-                    after_each.clone(),
-                    prefix,
-                    format!("failed to parse prefix for field `{}`", name),
-                    false,
-                );
-            }
-
-            let parser = match &attrs.parser {
-                Some(p) => p,
-                None => ty,
-            };
-            tokens.extend(quote! {let #name = });
-            parse_tokens.parse(
-                wc,
-                &mut tokens,
-                after_each.clone(),
-                parser.clone(),
-                format!("could not parse field `{}`", name),
-                attrs.parser.is_some(),
-            );
-
-            if let Some(suffix) = attrs.suffix.clone() {
-                parse_tokens.parse(
-                    wc,
-                    &mut tokens,
-                    after_each.clone(),
-                    suffix,
-                    format!("failed to parse tuple for field `{}`", name),
-                    false,
-                );
-            }
-
-            output.extend(quote! { #name.into(), })
-        }
-
-        if let Some(suffix) = self.attrs.suffix.clone() {
-            parse_tokens.parse(
-                wc,
-                &mut tokens,
-                after_each.clone(),
-                suffix,
-                format!("failed to parse suffix for tuple `{}`", tuple_path),
-                false,
-            );
-        }
-
-        tokens.extend(quote! {
-            Ok(#tuple_path(#output))
-        });
+        tokens.extend(self.fix(&attrs.suffix, "suffix", format!("field `{}`", name)));
 
         tokens
-    }
-}
-
-pub fn path_from_ident(ident: syn::Ident) -> syn::Path {
-    let mut segments = syn::punctuated::Punctuated::new();
-    segments.push(syn::PathSegment {
-        ident,
-        arguments: Default::default(),
-    });
-
-    syn::Path {
-        leading_colon: None,
-        segments: segments,
-    }
-}
-
-pub fn path_from_idents(idents: Vec<syn::Ident>) -> syn::Path {
-    let mut segments = syn::punctuated::Punctuated::new();
-    for ident in idents {
-        segments.push(syn::PathSegment {
-            ident,
-            arguments: Default::default(),
-        });
-    }
-
-    syn::Path {
-        leading_colon: None,
-        segments: segments,
     }
 }

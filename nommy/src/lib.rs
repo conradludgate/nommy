@@ -7,27 +7,53 @@
 //! Type based parsing library
 //!
 //! ```
-//! use nommy::{parse, Parse, text::Tag};
+//! use nommy::{parse, text::*, Parse};
 //!
-//! #[derive(Parse)]
-//! struct FooBar {
-//!     foo: Tag<"foo">,
-//!     bar: Tag<"bar">,
+//! type Letters = AnyOf1<"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ">;
+//!
+//! #[derive(Debug, Parse, PartialEq)]
+//! #[nommy(prefix = Tag<"struct">)]
+//! #[nommy(ignore_whitespace)]
+//! struct StructNamed {
+//!     #[nommy(parser = Letters)]
+//!     name: String,
+//!
+//!     #[nommy(prefix = Tag<"{">, suffix = Tag<"}">)]
+//!     fields: Vec<NamedField>,
 //! }
 //!
-//! let _: FooBar = parse("foobar".chars()).unwrap();
+//! #[derive(Debug, Parse, PartialEq)]
+//! #[nommy(suffix = Tag<",">)]
+//! #[nommy(ignore_whitespace = "all")]
+//! struct NamedField {
+//!     #[nommy(parser = Letters)]
+//!     name: String,
 //!
-//! #[derive(Parse, PartialEq, Debug)]
-//! enum FooOrBar {
-//!     Foo(Tag<"foo">),
-//!     Bar(Tag<"bar">),
+//!     #[nommy(prefix = Tag<":">, parser = Letters)]
+//!     ty: String,
 //! }
+//! let input = "struct Foo {
+//!     bar: Abc,
+//!     baz: Xyz,
+//! }";
 //!
-//! let output: FooOrBar = parse("foo".chars()).unwrap();
-//! assert_eq!(output, FooOrBar::Foo(Tag::<"foo">));
-//!
-//! let output: FooOrBar = parse("bar".chars()).unwrap();
-//! assert_eq!(output, FooOrBar::Bar(Tag::<"bar">));
+//! let struct_: StructNamed = parse(input.chars()).unwrap();
+//! assert_eq!(
+//!     struct_,
+//!     StructNamed {
+//!         name: "Foo".to_string(),
+//!         fields: vec![
+//!             NamedField {
+//!                 name: "bar".to_string(),
+//!                 ty: "Abc".to_string(),
+//!             },
+//!             NamedField {
+//!                 name: "baz".to_string(),
+//!                 ty: "Xyz".to_string(),
+//!             },
+//!         ]
+//!     }
+//! );
 //! ```
 
 pub mod impls;
@@ -44,27 +70,53 @@ pub use impls::Vec1;
 /// Derive Parse for structs or enums
 ///
 /// ```
-/// use nommy::{parse, Parse, text::Tag};
+/// use nommy::{parse, text::*, Parse};
 ///
-/// #[derive(Parse)]
-/// struct FooBar {
-///     foo: Tag<"foo">,
-///     bar: Tag<"bar">,
+/// type Letters = AnyOf1<"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ">;
+///
+/// #[derive(Debug, Parse, PartialEq)]
+/// #[nommy(prefix = Tag<"struct">)]
+/// #[nommy(ignore_whitespace)]
+/// struct StructNamed {
+///     #[nommy(parser = Letters)]
+///     name: String,
+///
+///     #[nommy(prefix = Tag<"{">, suffix = Tag<"}">)]
+///     fields: Vec<NamedField>,
 /// }
 ///
-/// let _: FooBar = parse("foobar".chars()).unwrap();
+/// #[derive(Debug, Parse, PartialEq)]
+/// #[nommy(suffix = Tag<",">)]
+/// #[nommy(ignore_whitespace = "all")]
+/// struct NamedField {
+///     #[nommy(parser = Letters)]
+///     name: String,
 ///
-/// #[derive(Parse, PartialEq, Debug)]
-/// enum FooOrBar {
-///     Foo(Tag<"foo">),
-///     Bar(Tag<"bar">),
+///     #[nommy(prefix = Tag<":">, parser = Letters)]
+///     ty: String,
 /// }
+/// let input = "struct Foo {
+///     bar: Abc,
+///     baz: Xyz,
+/// }";
 ///
-/// let output: FooOrBar = parse("foo".chars()).unwrap();
-/// assert_eq!(output, FooOrBar::Foo(Tag::<"foo">));
-///
-/// let output: FooOrBar = parse("bar".chars()).unwrap();
-/// assert_eq!(output, FooOrBar::Bar(Tag::<"bar">));
+/// let struct_: StructNamed = parse(input.chars()).unwrap();
+/// assert_eq!(
+///     struct_,
+///     StructNamed {
+///         name: "Foo".to_string(),
+///         fields: vec![
+///             NamedField {
+///                 name: "bar".to_string(),
+///                 ty: "Abc".to_string(),
+///             },
+///             NamedField {
+///                 name: "baz".to_string(),
+///                 ty: "Xyz".to_string(),
+///             },
+///         ]
+///     }
+/// );
 /// ```
 pub use nommy_derive::Parse;
 
@@ -76,8 +128,8 @@ pub use eyre;
 /// use nommy::{parse, text::Tag};
 /// let dot: Tag<"."> = parse(".".chars()).unwrap();
 /// ```
-pub fn parse<P: Parse<I::Item>, I: IntoIterator>(iter: I) -> eyre::Result<P> {
-    P::parse(&mut Buffer::new(iter))
+pub fn parse<P: Parse<<I::Iter as Iterator>::Item>, I: IntoBuf>(iter: I) -> eyre::Result<P> {
+    P::parse(&mut iter.into_buf())
 }
 
 /// parse_terminated takes the given iterator, putting it through `P::parse`,
@@ -90,8 +142,10 @@ pub fn parse<P: Parse<I::Item>, I: IntoIterator>(iter: I) -> eyre::Result<P> {
 /// let res: Result<Tag<".">, _> = parse_terminated("..".chars());
 /// res.unwrap_err();
 /// ```
-pub fn parse_terminated<P: Parse<I::Item>, I: IntoIterator>(iter: I) -> eyre::Result<P> {
-    let mut buffer = Buffer::new(iter);
+pub fn parse_terminated<P: Parse<<I::Iter as Iterator>::Item>, I: IntoBuf>(
+    iter: I,
+) -> eyre::Result<P> {
+    let mut buffer = iter.into_buf();
     let output = P::parse(&mut buffer)?;
     if buffer.next().is_some() {
         Err(eyre::eyre!("input was not parsed completely"))
@@ -106,12 +160,12 @@ pub fn parse_terminated<P: Parse<I::Item>, I: IntoIterator>(iter: I) -> eyre::Re
 /// Parse can be derived for some types
 ///
 /// ```
-/// use nommy::{Parse, Buffer, text::Tag};
-/// let mut buffer = Buffer::new(".".chars());
+/// use nommy::{Parse, IntoBuf, text::Tag};
+/// let mut buffer = ".".chars().into_buf();
 /// Tag::<".">::parse(&mut buffer).unwrap();
 /// ```
 pub trait Parse<T>: Sized + Peek<T> {
-    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> eyre::Result<Self>;
+    fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self>;
 }
 
 /// An interface with dealing with parser-peeking.
@@ -121,12 +175,12 @@ pub trait Parse<T>: Sized + Peek<T> {
 /// the [Parse::parse] function, it should succeed.
 ///
 /// ```
-/// use nommy::{Peek, Buffer, text::Tag};
-/// let mut buffer = Buffer::new(".".chars());
+/// use nommy::{Peek, Buffer, IntoBuf, text::Tag};
+/// let mut buffer = ".".chars().into_buf();
 /// assert!(Tag::<".">::peek(&mut buffer.cursor()));
 /// ```
 pub trait Peek<T>: Sized {
-    fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool;
+    fn peek(input: &mut impl Buffer<T>) -> bool;
 }
 
 /// Process is a standard interface to map a generated AST from the output of [Parse::parse].
@@ -137,11 +191,27 @@ pub trait Process {
     fn process(self) -> Self::Output;
 }
 
+pub trait Buffer<T>: Iterator<Item = T> {
+    type Iter: Iterator<Item = T>;
+    fn cursor(&mut self) -> Cursor<Self::Iter>;
+    fn fast_forward(&mut self, n: usize);
+}
+pub trait IntoBuf {
+    type Iter: Iterator;
+    fn into_buf(self) -> Buf<Self::Iter>;
+}
+impl<I: IntoIterator> IntoBuf for I {
+    type Iter = I::IntoIter;
+    fn into_buf(self) -> Buf<Self::Iter> {
+        Buf::new(self)
+    }
+}
+
 /// Buffer is a wrapper around an [Iterator], highly linked to [Cursor]
 ///
 /// ```
-/// use nommy::Buffer;
-/// let mut buffer = Buffer::new(0..);
+/// use nommy::{Buffer, IntoBuf};
+/// let mut buffer = (0..).into_buf();
 /// let mut cursor1 = buffer.cursor();
 ///
 /// // cursors act exactly like an iterator
@@ -159,12 +229,12 @@ pub trait Process {
 /// // Same with the original buffer
 /// assert_eq!(buffer.next(), Some(0));
 /// ```
-pub struct Buffer<I: Iterator> {
+pub struct Buf<I: Iterator> {
     iter: I,
     buffer: VecDeque<I::Item>,
 }
 
-impl<I: Iterator> Iterator for Buffer<I> {
+impl<I: Iterator> Iterator for Buf<I> {
     type Item = I::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -176,35 +246,58 @@ impl<I: Iterator> Iterator for Buffer<I> {
     }
 }
 
-impl<I: Iterator> Buffer<I> {
-    /// Create a new Buffer
+impl<I: Iterator> Buf<I> {
+    /// Create a new Buf
     pub fn new(iter: impl IntoIterator<IntoIter = I>) -> Self {
-        Buffer {
+        Buf {
             iter: iter.into_iter(),
             buffer: VecDeque::new(),
         }
     }
+}
 
+impl<I: Iterator> Buffer<I::Item> for Buf<I> {
+    type Iter = I;
     /// Create a [Cursor] over this buffer
-    pub fn cursor(&mut self) -> Cursor<I> {
+    fn cursor(&mut self) -> Cursor<I> {
         Cursor {
             buf: self,
             base: 0,
             index: 0,
         }
     }
+
+    /// Skip forward `n` steps in the iterator
+    /// Often paired with [Cursor::cursor] and [Cursor::close]
+    fn fast_forward(&mut self, n: usize) {
+        let len = self.buffer.len();
+        if len <= n {
+            self.buffer.clear();
+            for _ in 0..(n - len) {
+                if self.iter.next().is_none() {
+                    break;
+                }
+            }
+        } else {
+            self.buffer.rotate_left(n);
+            self.buffer.truncate(len - n);
+        }
+    }
 }
 
 /// Cursors are heavily related to [Buffer]s. Refer there for documentation
 pub struct Cursor<'a, I: Iterator> {
-    buf: &'a mut Buffer<I>,
+    buf: &'a mut Buf<I>,
     base: usize,
     index: usize,
 }
 
-impl<'a, I: Iterator> Cursor<'a, I> {
-    /// Create a new cursor, starting from where this cursor left off
-    pub fn cursor(&mut self) -> Cursor<I> {
+impl<'a, I: Iterator> Buffer<I::Item> for Cursor<'a, I>
+where
+    I::Item: Clone,
+{
+    type Iter = I;
+    fn cursor(&mut self) -> Cursor<I> {
         Cursor {
             buf: self.buf,
             base: self.index + self.base,
@@ -212,15 +305,17 @@ impl<'a, I: Iterator> Cursor<'a, I> {
         }
     }
 
+    /// Skip forward `n` steps in the iterator
+    /// Often paired with [Cursor::cursor] and [Cursor::close]
+    fn fast_forward(&mut self, n: usize) {
+        self.index += n;
+    }
+}
+
+impl<'a, I: Iterator> Cursor<'a, I> {
     /// Drop the Cursor, returning how many items have been read since it was created.
     pub fn close(self) -> usize {
         self.index
-    }
-
-    /// Skip forward `n` steps in the iterator
-    /// Often paired with [Cursor::cursor] and [Cursor::close]
-    pub fn fast_forward(&mut self, n: usize) {
-        self.index += n;
     }
 }
 
@@ -252,11 +347,13 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::IntoBuf;
+
     use super::Buffer;
 
     #[test]
     fn cursor_isolation() {
-        let mut buffer = Buffer::new("something".chars());
+        let mut buffer = "something".chars().into_buf();
         {
             let mut cursor1 = buffer.cursor();
             assert_eq!(cursor1.next(), Some('s'));
@@ -279,7 +376,7 @@ mod tests {
 
     #[test]
     fn cursor_fast_forward() {
-        let mut buffer = Buffer::new(0..);
+        let mut buffer = (0..).into_buf();
 
         let mut cursor = buffer.cursor();
         cursor.fast_forward(2);

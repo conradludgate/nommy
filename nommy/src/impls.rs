@@ -10,8 +10,8 @@ impl fmt::Display for EnumParseError {
     }
 }
 
-impl<P: Peek<T>, T> Peek<T> for Option<P> {
-    fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool {
+impl<P: Peek<T>, T: Clone> Peek<T> for Option<P> {
+    fn peek(input: &mut impl Buffer<T>) -> bool {
         let mut cursor = input.cursor();
 
         if P::peek(&mut cursor) {
@@ -25,8 +25,8 @@ impl<P: Peek<T>, T> Peek<T> for Option<P> {
 }
 
 /// Result is None if parsing P fails, otherwise, result is Some(p)
-impl<P: Parse<T>, T> Parse<T> for Option<P> {
-    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> eyre::Result<Self> {
+impl<P: Parse<T>, T: Clone> Parse<T> for Option<P> {
+    fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self> {
         if P::peek(&mut input.cursor()) {
             Ok(Some(
                 P::parse(input).expect("peek succeeded but parse failed"),
@@ -44,8 +44,8 @@ impl<P: Process> Process for Option<P> {
     }
 }
 
-impl<P: Peek<T>, T> Peek<T> for Vec<P> {
-    fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool {
+impl<P: Peek<T>, T: Clone> Peek<T> for Vec<P> {
+    fn peek(input: &mut impl Buffer<T>) -> bool {
         loop {
             let mut cursor = input.cursor();
             if !P::peek(&mut cursor) {
@@ -59,8 +59,8 @@ impl<P: Peek<T>, T> Peek<T> for Vec<P> {
 }
 
 /// Repeatedly attempts to parse P, Result is all successful attempts
-impl<P: Parse<T>, T> Parse<T> for Vec<P> {
-    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> eyre::Result<Self> {
+impl<P: Parse<T>, T: Clone> Parse<T> for Vec<P> {
+    fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self> {
         let mut output = vec![];
         while P::peek(&mut input.cursor()) {
             output.push(P::parse(input).expect("peek succeeded but parse failed"));
@@ -99,8 +99,8 @@ impl<P> Vec1<P> {
     }
 }
 
-impl<P: Peek<T>, T> Peek<T> for Vec1<P> {
-    fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool {
+impl<P: Peek<T>, T: Clone> Peek<T> for Vec1<P> {
+    fn peek(input: &mut impl Buffer<T>) -> bool {
         if !P::peek(input) {
             return false;
         }
@@ -120,8 +120,8 @@ impl<P: Peek<T>, T> Peek<T> for Vec1<P> {
 
 /// Repeatedly attempt to parse P, Result is all successful attempts
 /// Must parse P at least once
-impl<P: Parse<T>, T> Parse<T> for Vec1<P> {
-    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> eyre::Result<Self> {
+impl<P: Parse<T>, T: Clone> Parse<T> for Vec1<P> {
+    fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self> {
         let mut output = vec![P::parse(input)?];
         while P::peek(&mut input.cursor()) {
             output.push(P::parse(input).expect("peek succeeded but parse failed"));
@@ -139,7 +139,7 @@ impl<P: Process> Process for Vec1<P> {
 }
 
 impl<P: Peek<T>, T, const N: usize> Peek<T> for [P; N] {
-    fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool {
+    fn peek(input: &mut impl Buffer<T>) -> bool {
         for _ in 0..N {
             if !P::peek(input) {
                 return false;
@@ -157,7 +157,7 @@ impl<P: Peek<T>, T, const N: usize> Peek<T> for [P; N] {
 /// let _: [Tag<".">; 3] = parse("...".chars()).unwrap();
 /// ```
 impl<P: Parse<T>, T, const N: usize> Parse<T> for [P; N] {
-    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> eyre::Result<Self> {
+    fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self> {
         // safety: we only return the new data if no errors occured,
         // and if no errors occured, then we definitely filled all N spaces
         // therefore the array was initialised.
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn sequence_peek() {
-        let mut input = Buffer::new("...-".chars());
+        let mut input = "...-".chars().into_buf();
         let mut cursor = input.cursor();
         assert!(Vec::<Tag<".">>::peek(&mut cursor));
         assert_eq!(cursor.next(), Some('-'));
@@ -213,7 +213,7 @@ mod tests {
 
     #[test]
     fn sequence2_peek() {
-        let mut input = Buffer::new("-...-".chars());
+        let mut input = "-...-".chars().into_buf();
         let mut cursor = input.cursor();
 
         assert!(Tag::<"-">::peek(&mut cursor));

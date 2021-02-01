@@ -16,8 +16,8 @@ impl<const TAG: &'static [u8]> fmt::Display for TagParseError<TAG> {
 /// Tag is a generic type that implements Parse to match the given string exactly
 ///
 /// ```
-/// use nommy::{Parse, Buffer, bytes::Tag};
-/// let mut buffer = Buffer::new("foobarbaz".bytes());
+/// use nommy::{Parse, IntoBuf, bytes::Tag};
+/// let mut buffer = "foobarbaz".bytes().into_buf();
 /// Tag::<b"foobar">::parse(&mut buffer).unwrap();
 /// Tag::<b"baz">::parse(&mut buffer).unwrap();
 /// ```
@@ -31,13 +31,13 @@ impl<const TAG: &'static [u8]> Process for Tag<TAG> {
 }
 
 impl<const TAG: &'static [u8]> Peek<u8> for Tag<TAG> {
-    fn peek(input: &mut Cursor<impl Iterator<Item = u8>>) -> bool {
+    fn peek(input: &mut impl Buffer<u8>) -> bool {
         TAG.iter().cloned().eq(input.take(TAG.len()))
     }
 }
 
 impl<const TAG: &'static [u8]> Parse<u8> for Tag<TAG> {
-    fn parse(input: &mut Buffer<impl Iterator<Item = u8>>) -> eyre::Result<Self> {
+    fn parse(input: &mut impl Buffer<u8>) -> eyre::Result<Self> {
         let b: Vec<u8> = input.take(TAG.len()).collect();
         if TAG == &b {
             Ok(Tag)
@@ -50,11 +50,11 @@ impl<const TAG: &'static [u8]> Parse<u8> for Tag<TAG> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{parse, Buffer, Parse};
+    use crate::{parse, Parse};
 
     #[test]
     fn test_parse_matches() {
-        let mut input = Buffer::new("(){}[]<>".bytes());
+        let mut input = "(){}[]<>".bytes().into_buf();
         Tag::<b"(">::parse(&mut input).unwrap();
         Tag::<b")">::parse(&mut input).unwrap();
         Tag::<b"{">::parse(&mut input).unwrap();

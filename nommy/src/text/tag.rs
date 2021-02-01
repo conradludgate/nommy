@@ -6,8 +6,8 @@ use crate::*;
 /// Tag is a generic type that implements Parse to match the given string exactly
 ///
 /// ```
-/// use nommy::{Parse, Buffer, text::Tag};
-/// let mut buffer = Buffer::new("foobarbaz".chars());
+/// use nommy::{Parse, IntoBuf, text::Tag};
+/// let mut buffer = "foobarbaz".chars().into_buf();
 /// Tag::<"foobar">::parse(&mut buffer).unwrap();
 /// Tag::<"baz">::parse(&mut buffer).unwrap();
 /// ```
@@ -21,13 +21,13 @@ impl<const TAG: &'static str> Process for Tag<TAG> {
 }
 
 impl<const TAG: &'static str> Peek<char> for Tag<TAG> {
-    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
+    fn peek(input: &mut impl Buffer<char>) -> bool {
         TAG.chars().eq(input.take(TAG.len()))
     }
 }
 
 impl<const TAG: &'static str> Parse<char> for Tag<TAG> {
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> eyre::Result<Self> {
+    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         let s = String::from_iter(input.take(TAG.len()));
         if TAG == &s {
             Ok(Tag)
@@ -44,7 +44,7 @@ mod tests {
 
     #[test]
     fn test_parse_matches() {
-        let mut input = Buffer::new("(){}[]<>".chars());
+        let mut input = "(){}[]<>".chars().into_buf();
         Tag::<"(">::parse(&mut input).unwrap();
         Tag::<")">::parse(&mut input).unwrap();
         Tag::<"{">::parse(&mut input).unwrap();
@@ -58,7 +58,7 @@ mod tests {
 
     #[test]
     fn test_peek_matches() {
-        let mut input = Buffer::new("(){}[]<>".chars());
+        let mut input = "(){}[]<>".chars().into_buf();
         let mut cursor = input.cursor();
         assert!(Tag::<"(">::peek(&mut cursor));
         assert!(Tag::<")">::peek(&mut cursor));

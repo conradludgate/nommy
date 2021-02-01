@@ -5,8 +5,8 @@ use std::{fmt, ops::RangeInclusive};
 /// OneOf is a generic type that implements Parse to match one character within the given string
 ///
 /// ```
-/// use nommy::{Parse, Process, Buffer, text::OneOf};
-/// let mut buffer = Buffer::new("-".chars());
+/// use nommy::{Parse, Process, IntoBuf, text::OneOf};
+/// let mut buffer = "-".chars().into_buf();
 /// let c = OneOf::<"-_">::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), '-');
 /// ```
@@ -20,7 +20,7 @@ impl<const CHARS: &'static str> Process for OneOf<CHARS> {
 }
 
 impl<const CHARS: &'static str> Peek<char> for OneOf<CHARS> {
-    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
+    fn peek(input: &mut impl Buffer<char>) -> bool {
         match input.next() {
             Some(c) => CHARS.contains(c),
             None => false,
@@ -29,7 +29,7 @@ impl<const CHARS: &'static str> Peek<char> for OneOf<CHARS> {
 }
 
 impl<const CHARS: &'static str> Parse<char> for OneOf<CHARS> {
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> eyre::Result<Self> {
+    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         match input.next() {
             Some(c) => {
                 if CHARS.contains(c) {
@@ -69,8 +69,8 @@ impl<const CHAR_RANGE: RangeInclusive<char>> fmt::Display for OneInRangeError<CH
 /// OneInRange is a generic type that implements Parse to match one character within the given range
 ///
 /// ```
-/// use nommy::{Parse, Process, Buffer, text::OneInRange};
-/// let mut buffer = Buffer::new("12".chars());
+/// use nommy::{Parse, Process, IntoBuf, text::OneInRange};
+/// let mut buffer = "12".chars().into_buf();
 /// let c = OneInRange::<{'0'..='9'}>::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), '1');
 /// ```
@@ -84,7 +84,7 @@ impl<const CHAR_RANGE: RangeInclusive<char>> Process for OneInRange<CHAR_RANGE> 
 }
 
 impl<const CHAR_RANGE: RangeInclusive<char>> Peek<char> for OneInRange<CHAR_RANGE> {
-    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
+    fn peek(input: &mut impl Buffer<char>) -> bool {
         match input.next() {
             Some(c) => CHAR_RANGE.contains(&c),
             None => false,
@@ -93,7 +93,7 @@ impl<const CHAR_RANGE: RangeInclusive<char>> Peek<char> for OneInRange<CHAR_RANG
 }
 
 impl<const CHAR_RANGE: RangeInclusive<char>> Parse<char> for OneInRange<CHAR_RANGE> {
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> eyre::Result<Self> {
+    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         match input.next() {
             Some(c) => {
                 if CHAR_RANGE.contains(&c) {
@@ -110,8 +110,8 @@ impl<const CHAR_RANGE: RangeInclusive<char>> Parse<char> for OneInRange<CHAR_RAN
 /// OneLowercase parses one character that matches any lower ascii letters
 ///
 /// ```
-/// use nommy::{Parse, Process, Buffer, text::OneLowercase};
-/// let mut buffer = Buffer::new("helloWorld".chars());
+/// use nommy::{Parse, Process, IntoBuf, text::OneLowercase};
+/// let mut buffer = "helloWorld".chars().into_buf();
 /// let c = OneLowercase::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), 'h');
 /// ```
@@ -120,8 +120,8 @@ pub type OneLowercase = OneInRange<{ 'a'..='z' }>;
 /// OneUppercase parses one character that matches any upper ascii letters
 ///
 /// ```
-/// use nommy::{Parse, Process, Buffer, text::OneUppercase};
-/// let mut buffer = Buffer::new("HELLOworld".chars());
+/// use nommy::{Parse, Process, IntoBuf, text::OneUppercase};
+/// let mut buffer = "HELLOworld".chars().into_buf();
 /// let c = OneUppercase::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), 'H');
 /// ```
@@ -130,8 +130,8 @@ pub type OneUppercase = OneInRange<{ 'A'..='Z' }>;
 /// OneDigits parses one character that matches any ascii digits
 ///
 /// ```
-/// use nommy::{Parse, Process, Buffer, text::OneDigits};
-/// let mut buffer = Buffer::new("1024$".chars());
+/// use nommy::{Parse, Process, IntoBuf, text::OneDigits};
+/// let mut buffer = "1024$".chars().into_buf();
 /// let c = OneDigits::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), '1');
 /// ```

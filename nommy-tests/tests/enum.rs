@@ -1,4 +1,4 @@
-use nommy::{Buffer, Parse, text::Tag};
+use nommy::{IntoBuf, Parse, text::Tag};
 
 #[derive(Debug, Parse, PartialEq)]
 enum Enum {
@@ -12,7 +12,7 @@ enum Enum {
 }
 
 fn main() {
-    let mut input = Buffer::new("(...)".chars());
+    let mut input = "(...)".chars().into_buf();
 
     assert_eq!(Enum::parse(&mut input).unwrap(), Enum::Open(Tag::<"(">));
 

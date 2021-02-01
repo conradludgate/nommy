@@ -6,8 +6,8 @@ use super::OneOf;
 /// AnyOf1 is a generic type that implements Parse to match many characters within the given string
 ///
 /// ```
-/// use nommy::{Parse, Process, Buffer, bytes::AnyOf1};
-/// let mut buffer = Buffer::new("-_-.".bytes());
+/// use nommy::{Parse, Process, IntoBuf, bytes::AnyOf1};
+/// let mut buffer = "-_-.".bytes().into_buf();
 /// let c = AnyOf1::<b"-_">::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), b"-_-");
 /// ```
@@ -21,7 +21,7 @@ impl<const BYTES: &'static [u8]> Process for AnyOf1<BYTES> {
 }
 
 impl<const BYTES: &'static [u8]> Peek<u8> for AnyOf1<BYTES> {
-    fn peek(input: &mut Cursor<impl Iterator<Item = u8>>) -> bool {
+    fn peek(input: &mut impl Buffer<u8>) -> bool {
         if !OneOf::<BYTES>::peek(input) {
             return false;
         }
@@ -38,7 +38,7 @@ impl<const BYTES: &'static [u8]> Peek<u8> for AnyOf1<BYTES> {
 }
 
 impl<const BYTES: &'static [u8]> Parse<u8> for AnyOf1<BYTES> {
-    fn parse(input: &mut Buffer<impl Iterator<Item = u8>>) -> eyre::Result<Self> {
+    fn parse(input: &mut impl Buffer<u8>) -> eyre::Result<Self> {
         let mut output = Vec::new();
 
         while OneOf::<BYTES>::peek(&mut input.cursor()) {

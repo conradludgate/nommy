@@ -19,7 +19,7 @@ impl Process for LineEnding {
 }
 
 impl Peek<char> for LineEnding {
-    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
+    fn peek(input: &mut impl Buffer<char>) -> bool {
         match input.next() {
             Some('\n') => true,
             Some('\r') => input.next() == Some('\n'),
@@ -29,7 +29,7 @@ impl Peek<char> for LineEnding {
 }
 
 impl Parse<char> for LineEnding {
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> eyre::Result<Self> {
+    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         match input.next() {
             Some('\n') => Ok(LineEnding),
             Some('\r') => {
@@ -55,13 +55,13 @@ impl Process for Space {
 }
 
 impl Peek<char> for Space {
-    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
+    fn peek(input: &mut impl Buffer<char>) -> bool {
         matches!(input.next(), Some(' ') | Some('\t'))
     }
 }
 
 impl Parse<char> for Space {
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> eyre::Result<Self> {
+    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         match input.next() {
             Some(' ') | Some('\t') => Ok(Space),
             _ => Err(eyre::eyre!("could not parse space or tab")),
@@ -81,7 +81,7 @@ impl Process for WhiteSpace {
 }
 
 impl Peek<char> for WhiteSpace {
-    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
+    fn peek(input: &mut impl Buffer<char>) -> bool {
         match input.next() {
             Some(' ') | Some('\t') | Some('\n') => true,
             Some('\r') => input.next() == Some('\n'),
@@ -91,7 +91,7 @@ impl Peek<char> for WhiteSpace {
 }
 
 impl Parse<char> for WhiteSpace {
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> eyre::Result<Self> {
+    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         match input.next() {
             Some(' ') | Some('\t') | Some('\n') => Ok(WhiteSpace),
             Some('\r') => {
@@ -112,14 +112,14 @@ mod tests {
 
     #[test]
     fn parse_spaces() {
-        let mut input = Buffer::new(" \t \t   \t\t  \t.".chars());
+        let mut input = " \t \t   \t\t  \t.".chars().into_buf();
         let output = Vec::<Space>::parse(&mut input).unwrap();
         assert_eq!(output.len(), 12);
         assert_eq!(input.next(), Some('.'));
     }
     #[test]
     fn peek_spaces() {
-        let mut input = Buffer::new(" \t \t   \t\t  \t.".chars());
+        let mut input = " \t \t   \t\t  \t.".chars().into_buf();
         let mut cursor = input.cursor();
         assert!(Vec::<Space>::peek(&mut cursor));
         assert_eq!(cursor.next(), Some('.'));
@@ -127,7 +127,7 @@ mod tests {
 
     #[test]
     fn parse_newline() {
-        let mut input = Buffer::new("\n.\r\n.".chars());
+        let mut input = "\n.\r\n.".chars().into_buf();
 
         let _ = LineEnding::parse(&mut input).unwrap();
         assert_eq!(input.next(), Some('.'));

@@ -31,7 +31,7 @@ struct Record {
 
 struct StringParser(String);
 impl Peek<char> for StringParser {
-    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
+    fn peek(input: &mut impl Buffer<char>) -> bool {
         if input.next() != Some('\"') {
             return false;
         }
@@ -51,7 +51,7 @@ impl Peek<char> for StringParser {
     }
 }
 impl Parse<char> for StringParser {
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> eyre::Result<Self> {
+    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         if input.next() != Some('\"') {
             return Err(eyre::eyre!("starting quote not found"));
         }

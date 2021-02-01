@@ -82,22 +82,22 @@ impl ToTokens for Named {
 
         tokens.extend(quote!{
             #[automatically_derived]
-            impl<#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
+            impl<#generic: Clone, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
             where #(
                 #parse_wc: ::nommy::Parse<#generic>,
             )* {
-                fn parse(input: &mut ::nommy::Buffer<impl ::std::iter::Iterator<Item=#generic>>) -> ::nommy::eyre::Result<Self> {
+                fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
                     use ::nommy::eyre::WrapErr;
                     #parse_fn_impl
                 }
             }
 
             #[automatically_derived]
-            impl<#generic, #(#args),*> ::nommy::Peek<#generic> for #name<#(#args),*>
+            impl<#generic: Clone, #(#args),*> ::nommy::Peek<#generic> for #name<#(#args),*>
             where #(
                 #peek_wc: ::nommy::Peek<#generic>,
             )* {
-                fn peek(input: &mut ::nommy::Cursor<impl ::std::iter::Iterator<Item=#generic>>) -> bool {
+                fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
                     #peek_fn_impl
                     true
                 }

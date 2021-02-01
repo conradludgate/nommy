@@ -77,11 +77,11 @@ impl ToTokens for Enum {
 
         tokens.extend(quote!{
             #[automatically_derived]
-            impl <#generic, #(#args),*> ::nommy::Peek<#generic> for #name<#(#args),*>
+            impl <#generic: Clone, #(#args),*> ::nommy::Peek<#generic> for #name<#(#args),*>
             where #(
                 #peek_wc: ::nommy::Peek<#generic>,
             )* {
-                fn peek(input: &mut ::nommy::Cursor<impl ::std::iter::Iterator<Item=#generic>>) -> bool {
+                fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
                     #peek_prefix
 
                     if #( !Self::#var_names_peek(&mut input.cursor()) )&&* {
@@ -95,11 +95,11 @@ impl ToTokens for Enum {
             }
 
             #[automatically_derived]
-            impl <#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
+            impl <#generic: Clone, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
             where #(
                 #parse_wc: ::nommy::Parse<#generic>,
             )* {
-                fn parse(input: &mut ::nommy::Buffer<impl ::std::iter::Iterator<Item=#generic>>) -> ::nommy::eyre::Result<Self> {
+                fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
                     use ::nommy::eyre::WrapErr;
 
                     #parse_prefix
@@ -122,7 +122,7 @@ impl ToTokens for Enum {
             impl<#(#args),*> #name<#(#args),*>
             {
                 #(
-                    fn #var_names_parse<#generic> (input: &mut ::nommy::Buffer<impl ::std::iter::Iterator<Item=#generic>>) -> ::nommy::eyre::Result<Self>
+                    fn #var_names_parse<#generic> (input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self>
                     where #(
                         #variant_parse_wc: ::nommy::Parse<#generic>,
                     )* {
@@ -130,7 +130,7 @@ impl ToTokens for Enum {
                         #variant_parse_impls
                     }
 
-                    fn #var_names_peek<#generic> (input: &mut ::nommy::Cursor<impl ::std::iter::Iterator<Item=#generic>>) -> bool
+                    fn #var_names_peek<#generic: Clone> (input: &mut impl ::nommy::Buffer<#generic>) -> bool
                     where #(
                         #variant_peek_wc: ::nommy::Peek<#generic>,
                     )* {

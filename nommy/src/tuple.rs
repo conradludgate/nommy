@@ -31,7 +31,7 @@ impl<$($T: Error),*> fmt::Display for $error<$($T),*>  {
 /// Implements Peek over a tuple. Returns true if all elements
 /// of the tuple return true, in order
 impl<T, $($T),*> Peek<T> for ($($T),*) where $($T: Peek<T>),* {
-    fn peek(input: &mut Cursor<impl Iterator<Item = T>>) -> bool {
+    fn peek(input: &mut impl Buffer<T>) -> bool {
         $(
             $T::peek(input)
         )&&*
@@ -43,7 +43,7 @@ impl<T, $($T),*> Peek<T> for ($($T),*) where $($T: Peek<T>),* {
 impl<T, $($T),*> Parse<T> for ($($T),*) where $($T: Parse<T>),* {
     type Error = $error<$($T::Error),*>;
 
-    fn parse(input: &mut Buffer<impl Iterator<Item = T>>) -> Result<Self, Self::Error> {
+    fn parse(input: &mut impl Buffer<T>) -> Result<Self, Self::Error> {
         Ok(($(
             $T::parse(input).map_err($error::$T)?,
         )*))

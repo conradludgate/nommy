@@ -19,8 +19,8 @@ impl<const BYTES: &'static [u8]> fmt::Display for OneOfError<BYTES> {
 /// OneOf is a generic type that implements Parse to match one character within the given string
 ///
 /// ```
-/// use nommy::{Parse, Process, Buffer, bytes::OneOf};
-/// let mut buffer = Buffer::new("-".bytes());
+/// use nommy::{Parse, Process, IntoBuf, bytes::OneOf};
+/// let mut buffer = "-".bytes().into_buf();
 /// let c = OneOf::<b"-_">::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), b'-');
 /// ```
@@ -34,7 +34,7 @@ impl<const BYTES: &'static [u8]> Process for OneOf<BYTES> {
 }
 
 impl<const BYTES: &'static [u8]> Peek<u8> for OneOf<BYTES> {
-    fn peek(input: &mut Cursor<impl Iterator<Item = u8>>) -> bool {
+    fn peek(input: &mut impl Buffer<u8>) -> bool {
         match input.next() {
             Some(c) => BYTES.contains(&c),
             None => false,
@@ -43,7 +43,7 @@ impl<const BYTES: &'static [u8]> Peek<u8> for OneOf<BYTES> {
 }
 
 impl<const BYTES: &'static [u8]> Parse<u8> for OneOf<BYTES> {
-    fn parse(input: &mut Buffer<impl Iterator<Item = u8>>) -> eyre::Result<Self> {
+    fn parse(input: &mut impl Buffer<u8>) -> eyre::Result<Self> {
         match input.next() {
             Some(c) => {
                 if BYTES.contains(&c) {
@@ -80,8 +80,8 @@ impl<const BYTE_RANGE: RangeInclusive<u8>> fmt::Display for OneInRangeError<BYTE
 /// OneInRange is a generic type that implements Parse to match one character within the given range
 ///
 /// ```
-/// use nommy::{Parse, Process, Buffer, bytes::OneInRange};
-/// let mut buffer = Buffer::new(5..);
+/// use nommy::{Parse, Process, IntoBuf, bytes::OneInRange};
+/// let mut buffer = (5..).into_buf();
 /// let c = OneInRange::<{0..=10}>::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), 5);
 /// ```
@@ -95,7 +95,7 @@ impl<const BYTE_RANGE: RangeInclusive<u8>> Process for OneInRange<BYTE_RANGE> {
 }
 
 impl<const BYTE_RANGE: RangeInclusive<u8>> Peek<u8> for OneInRange<BYTE_RANGE> {
-    fn peek(input: &mut Cursor<impl Iterator<Item = u8>>) -> bool {
+    fn peek(input: &mut impl Buffer<u8>) -> bool {
         match input.next() {
             Some(c) => BYTE_RANGE.contains(&c),
             None => false,
@@ -104,7 +104,7 @@ impl<const BYTE_RANGE: RangeInclusive<u8>> Peek<u8> for OneInRange<BYTE_RANGE> {
 }
 
 impl<const BYTE_RANGE: RangeInclusive<u8>> Parse<u8> for OneInRange<BYTE_RANGE> {
-    fn parse(input: &mut Buffer<impl Iterator<Item = u8>>) -> eyre::Result<Self> {
+    fn parse(input: &mut impl Buffer<u8>) -> eyre::Result<Self> {
         match input.next() {
             Some(c) => {
                 if BYTE_RANGE.contains(&c) {

@@ -63,12 +63,16 @@ struct Variant {
     ty: VariantType,
 }
 #[derive(Debug, Parse, PartialEq)]
-#[nommy(ignore_whitespace = "all")]
 enum VariantType {
+    #[nommy(ignore_whitespace = "all")]
     Struct(#[nommy(prefix = Tag<"{">, suffix = Tag<"}">)] Vec<NamedField>),
+
     #[nommy(suffix = Tag<",">)]
+    #[nommy(ignore_whitespace = "all")]
     Tuple(#[nommy(prefix = Tag<"(">, suffix = Tag<")">)] Vec<UnnamedField>),
+    
     #[nommy(suffix = Tag<",">)]
+    #[nommy(ignore_whitespace = "all")]
     Unit,
 }
 

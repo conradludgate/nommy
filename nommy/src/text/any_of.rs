@@ -10,8 +10,8 @@ use super::OneOf;
 /// AnyOf is a generic type that implements Parse to match many characters within the given string
 ///
 /// ```
-/// use nommy::{Parse, Process, Buffer, text::AnyOf};
-/// let mut buffer = Buffer::new("-_-.".chars());
+/// use nommy::{Parse, Process, IntoBuf, text::AnyOf};
+/// let mut buffer = "-_-.".chars().into_buf();
 /// let c = AnyOf::<"-_">::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), "-_-");
 /// ```
@@ -25,7 +25,7 @@ impl<const CHARS: &'static str> Process for AnyOf<CHARS> {
 }
 
 impl<const CHARS: &'static str> Peek<char> for AnyOf<CHARS> {
-    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
+    fn peek(input: &mut impl Buffer<char>) -> bool {
         loop {
             let mut cursor = input.cursor();
             if !OneOf::<CHARS>::peek(&mut cursor) {
@@ -39,7 +39,7 @@ impl<const CHARS: &'static str> Peek<char> for AnyOf<CHARS> {
 }
 
 impl<const CHARS: &'static str> Parse<char> for AnyOf<CHARS> {
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> eyre::Result<Self> {
+    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         let mut output = String::new();
 
         while OneOf::<CHARS>::peek(&mut input.cursor()) {
@@ -58,8 +58,8 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf<CHARS> {
 /// AnyOf is a generic type that implements Parse to match many characters within the given string
 ///
 /// ```
-/// use nommy::{Parse, Process, Buffer, text::AnyOf};
-/// let mut buffer = Buffer::new("-_-.".chars());
+/// use nommy::{Parse, Process, IntoBuf, text::AnyOf};
+/// let mut buffer = "-_-.".chars().into_buf();
 /// let c = AnyOf::<"-_">::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), "-_-");
 /// ```
@@ -73,7 +73,7 @@ impl<const CHARS: &'static str> Process for WhileNot1<CHARS> {
 }
 
 impl<const CHARS: &'static str> Peek<char> for WhileNot1<CHARS> {
-    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
+    fn peek(input: &mut impl Buffer<char>) -> bool {
         if OneOf::<CHARS>::peek(input) {
             return false;
         }
@@ -90,7 +90,7 @@ impl<const CHARS: &'static str> Peek<char> for WhileNot1<CHARS> {
 }
 
 impl<const CHARS: &'static str> Parse<char> for WhileNot1<CHARS> {
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> eyre::Result<Self> {
+    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         let mut output = String::new();
 
         while !OneOf::<CHARS>::peek(&mut input.cursor()) {
@@ -113,8 +113,8 @@ impl<const CHARS: &'static str> Parse<char> for WhileNot1<CHARS> {
 /// AnyOf1 is a generic type that implements Parse to match many characters within the given string
 ///
 /// ```
-/// use nommy::{Parse, Process, Buffer, text::AnyOf1};
-/// let mut buffer = Buffer::new("-_-.".chars());
+/// use nommy::{Parse, Process, IntoBuf, text::AnyOf1};
+/// let mut buffer = "-_-.".chars().into_buf();
 /// let c = AnyOf1::<"-_">::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), "-_-");
 /// ```
@@ -128,7 +128,7 @@ impl<const CHARS: &'static str> Process for AnyOf1<CHARS> {
 }
 
 impl<const CHARS: &'static str> Peek<char> for AnyOf1<CHARS> {
-    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
+    fn peek(input: &mut impl Buffer<char>) -> bool {
         if !OneOf::<CHARS>::peek(input) {
             return false;
         }
@@ -145,7 +145,7 @@ impl<const CHARS: &'static str> Peek<char> for AnyOf1<CHARS> {
 }
 
 impl<const CHARS: &'static str> Parse<char> for AnyOf1<CHARS> {
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> eyre::Result<Self> {
+    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         let mut output = String::new();
 
         while OneOf::<CHARS>::peek(&mut input.cursor()) {
@@ -168,8 +168,8 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf1<CHARS> {
 /// AnyInRange is a generic type that implements Parse to match many characters within the given range
 ///
 /// ```
-/// use nommy::{Parse, Process, Buffer, text::AnyInRange};
-/// let mut buffer = Buffer::new("hello world".chars());
+/// use nommy::{Parse, Process, IntoBuf, text::AnyInRange};
+/// let mut buffer = "hello world".chars().into_buf();
 /// let c = AnyInRange::<{'a'..='z'}>::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), "hello");
 /// ```
@@ -183,7 +183,7 @@ impl<const CHAR_RANGE: RangeInclusive<char>> Process for AnyInRange<CHAR_RANGE> 
 }
 
 impl<const CHAR_RANGE: RangeInclusive<char>> Peek<char> for AnyInRange<CHAR_RANGE> {
-    fn peek(input: &mut Cursor<impl Iterator<Item = char>>) -> bool {
+    fn peek(input: &mut impl Buffer<char>) -> bool {
         loop {
             let mut cursor = input.cursor();
             if !OneInRange::<CHAR_RANGE>::peek(&mut cursor) {
@@ -197,7 +197,7 @@ impl<const CHAR_RANGE: RangeInclusive<char>> Peek<char> for AnyInRange<CHAR_RANG
 }
 
 impl<const CHAR_RANGE: RangeInclusive<char>> Parse<char> for AnyInRange<CHAR_RANGE> {
-    fn parse(input: &mut Buffer<impl Iterator<Item = char>>) -> eyre::Result<Self> {
+    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         let mut output = String::new();
 
         while OneInRange::<CHAR_RANGE>::peek(&mut input.cursor()) {
@@ -215,8 +215,8 @@ impl<const CHAR_RANGE: RangeInclusive<char>> Parse<char> for AnyInRange<CHAR_RAN
 /// AnyLowercase parses any length of lower ascii letters
 ///
 /// ```
-/// use nommy::{Parse, Process, Buffer, text::AnyLowercase};
-/// let mut buffer = Buffer::new("helloWorld".chars());
+/// use nommy::{Parse, Process, IntoBuf, text::AnyLowercase};
+/// let mut buffer = "helloWorld".chars().into_buf();
 /// let c = AnyLowercase::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), "hello");
 /// ```
@@ -225,8 +225,8 @@ pub type AnyLowercase = AnyInRange<{ 'a'..='z' }>;
 /// AnyUppercase parses any length of upper ascii letters
 ///
 /// ```
-/// use nommy::{Parse, Process, Buffer, text::AnyUppercase};
-/// let mut buffer = Buffer::new("HELLOworld".chars());
+/// use nommy::{Parse, Process, IntoBuf, text::AnyUppercase};
+/// let mut buffer = "HELLOworld".chars().into_buf();
 /// let c = AnyUppercase::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), "HELLO");
 /// ```
@@ -235,8 +235,8 @@ pub type AnyUppercase = AnyInRange<{ 'A'..='Z' }>;
 /// AnyDigits parses any length of ascii digits
 ///
 /// ```
-/// use nommy::{Parse, Process, Buffer, text::AnyDigits};
-/// let mut buffer = Buffer::new("1024$".chars());
+/// use nommy::{Parse, Process, IntoBuf, text::AnyDigits};
+/// let mut buffer = "1024$".chars().into_buf();
 /// let c = AnyDigits::parse(&mut buffer).unwrap();
 /// assert_eq!(c.process(), "1024");
 /// ```
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn any_of_peek() {
-        let mut buffer = Buffer::new("1024$".chars());
+        let mut buffer = "1024$".chars().into_buf();
         let mut cursor = buffer.cursor();
         assert!(AnyOf::<"0123456789">::peek(&mut cursor));
         assert_eq!(cursor.next(), Some('$'));

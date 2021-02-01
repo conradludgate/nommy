@@ -2,27 +2,51 @@
 A type based parsing library with convenient macros
 
 ```rust
-use nommy::{parse, Parse, TextTag};
+use nommy::{parse, text::*, Parse};
 
-TextTag![Foo: "foo", Bar: "bar"];
+type Letters = AnyOf1<"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ">;
 
-#[derive(Parse)]
-struct FooBar {
-    foo: Foo,
-    bar: Bar,
+#[derive(Debug, Parse, PartialEq)]
+#[nommy(prefix = Tag<"struct">)]
+#[nommy(ignore_whitespace)]
+struct StructNamed {
+    #[nommy(parser = Letters)]
+    name: String,
+
+    #[nommy(prefix = Tag<"{">, suffix = Tag<"}">)]
+    fields: Vec<NamedField>,
 }
 
-let _: FooBar = parse("foobar".chars()).unwrap();
+#[derive(Debug, Parse, PartialEq)]
+#[nommy(suffix = Tag<",">)]
+#[nommy(ignore_whitespace = "all")]
+struct NamedField {
+    #[nommy(parser = Letters)]
+    name: String,
 
-#[derive(Parse, PartialEq, Debug)]
-enum FooOrBar {
-    Foo(Foo),
-    Bar(Bar),
+    #[nommy(prefix = Tag<":">, parser = Letters)]
+    ty: String,
 }
+let input = "struct Foo {
+    bar: Abc,
+    baz: Xyz,
+}";
 
-let output: FooOrBar = parse("foo".chars()).unwrap();
-assert_eq!(output, FooOrBar::Foo(Foo));
-
-let output: FooOrBar = parse("bar".chars()).unwrap();
-assert_eq!(output, FooOrBar::Bar(Bar));
+let struct_: StructNamed = parse(input.chars()).unwrap();
+assert_eq!(
+    struct_,
+    StructNamed {
+        name: "Foo".to_string(),
+        fields: vec![
+            NamedField {
+                name: "bar".to_string(),
+                ty: "Abc".to_string(),
+            },
+            NamedField {
+                name: "baz".to_string(),
+                ty: "Xyz".to_string(),
+            },
+        ]
+    }
+);
 ```

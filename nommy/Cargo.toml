@@ -1,6 +1,6 @@
 [package]
 name = "nommy"
-version = "0.1.4"
+version = "0.2.0"
 authors = ["Conrad Ludgate <conradludgate@gmail.com>"]
 edition = "2018"
 description = "Type based parser"
@@ -9,5 +9,5 @@ repository = "https://github.com/conradludgate/nommy"
 readme = "../README.md"
 
 [dependencies]
-nommy_derive = { path = "../nommy-derive", version = "=0.1.1" }
+nommy_derive = { path = "../nommy-derive", version = "=0.2.0" }
 eyre = "0.6"

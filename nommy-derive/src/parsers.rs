@@ -12,6 +12,33 @@ pub struct NamedField {
     pub ty: syn::Type,
 }
 
+impl From<syn::Field> for NamedField {
+    fn from(field: syn::Field) -> Self {
+        let syn::Field {
+            ident, attrs, ty, ..
+        } = field;
+        let attrs = FieldAttr::parse_attrs(attrs);
+        NamedField {
+            attrs,
+            name: ident.unwrap(),
+            ty,
+        }
+    }
+}
+
+impl From<syn::Field> for UnnamedField {
+    fn from(field: syn::Field) -> Self {
+        let syn::Field {
+            attrs, ty, ..
+        } = field;
+        let attrs = FieldAttr::parse_attrs(attrs);
+        UnnamedField {
+            attrs,
+            ty,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct UnnamedField {
     pub attrs: FieldAttr,
@@ -52,7 +79,7 @@ pub trait PTokens {
     const ASSIGN: bool;
     fn tokens(
         ty: &syn::Type,
-        generic: &syn::Ident,
+        generic: &syn::Type,
         error: impl AsRef<str>,
         process: bool,
     ) -> TokenStream;
@@ -63,7 +90,7 @@ impl PTokens for Parser {
     const ASSIGN: bool = true;
     fn tokens(
         ty: &syn::Type,
-        generic: &syn::Ident,
+        generic: &syn::Type,
         error: impl AsRef<str>,
         process: bool,
     ) -> TokenStream {
@@ -85,7 +112,7 @@ impl PTokens for Parser {
 pub struct Peeker;
 impl PTokens for Peeker {
     const ASSIGN: bool = false;
-    fn tokens(ty: &syn::Type, generic: &syn::Ident, _: impl AsRef<str>, _: bool) -> TokenStream {
+    fn tokens(ty: &syn::Type, generic: &syn::Type, _: impl AsRef<str>, _: bool) -> TokenStream {
         quote! {
             if !(<#ty as ::nommy::Peek<#generic>>::peek(input)) { return false }
         }
@@ -94,7 +121,7 @@ impl PTokens for Peeker {
 
 pub struct FunctionBuilder<'a, P: PTokens> {
     pub wc: &'a mut Vec<syn::Type>,
-    pub generic: &'a syn::Ident,
+    pub generic: &'a syn::Type,
     after_each: TokenStream,
     _phantom: PhantomData<P>,
 }
@@ -102,7 +129,7 @@ pub struct FunctionBuilder<'a, P: PTokens> {
 impl<'a, P: PTokens> FunctionBuilder<'a, P> {
     pub fn new(
         wc: &'a mut Vec<syn::Type>,
-        generic: &'a syn::Ident,
+        generic: &'a syn::Type,
         ignore_ws: &Option<IgnoreWS>,
     ) -> Self {
         let after_each = match &ignore_ws {

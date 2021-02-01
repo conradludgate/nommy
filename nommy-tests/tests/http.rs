@@ -47,6 +47,7 @@ struct HTTP {
     headers: Vec<Header>,
 }
 
+
 #[derive(Debug, PartialEq, Parse)]
 #[nommy(ignore_whitespace = "spaces")]
 #[nommy(prefix = Tag<"\n">)]

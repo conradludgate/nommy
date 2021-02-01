@@ -6,6 +6,7 @@ pub struct GlobalAttr {
     pub debug: bool,
     pub prefix: Option<syn::Type>,
     pub suffix: Option<syn::Type>,
+    pub parse_type: Option<syn::Type>,
 }
 
 fn parse_type_into(ty: &mut Option<syn::Type>, mut tokens: proc_macro2::token_stream::IntoIter) {
@@ -82,6 +83,7 @@ impl GlobalAttr {
             "ignore_whitespace" => self.parse_ignore_ws(tokens),
             "prefix" => parse_type_into(&mut self.prefix, tokens),
             "suffix" => parse_type_into(&mut self.suffix, tokens),
+            "parse_type" => parse_type_into(&mut self.parse_type, tokens),
             "debug" => self.debug = true,
             s => panic!("unknown parameter {}", s),
         }

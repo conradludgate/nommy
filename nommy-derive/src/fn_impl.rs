@@ -17,7 +17,7 @@ fn build<T: FieldType, F: FnImpl<T>, P: PTokens>(fn_impl: &F) -> BuildOutput {
     let attrs = fn_impl.attrs();
 
     let mut builder =
-        FunctionBuilder::<P>::new(&mut wc, fn_impl.generic(), &attrs.ignore_whitespace);
+        FunctionBuilder::<P>::new(&mut wc, fn_impl.generic(), &attrs.ignore);
 
     let mut tokens = TokenStream::new();
 

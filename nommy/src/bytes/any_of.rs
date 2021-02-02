@@ -30,8 +30,7 @@ impl<const BYTES: &'static [u8]> Peek<u8> for AnyOf1<BYTES> {
             if !OneOf::<BYTES>::peek(&mut cursor) {
                 break;
             }
-            let skip = cursor.close();
-            input.fast_forward(skip);
+            cursor.fast_forward_parent()
         }
         true
     }

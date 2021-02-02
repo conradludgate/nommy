@@ -4,7 +4,7 @@ type Letters = AnyOf1<"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ">;
 
 #[derive(Debug, Parse, PartialEq)]
 #[nommy(prefix = Tag<"struct">)]
-#[nommy(ignore_whitespace)]
+#[nommy(ignore = WhiteSpaces)]
 struct StructNamed {
     #[nommy(parser = Letters)]
     name: String,
@@ -15,7 +15,7 @@ struct StructNamed {
 
 #[derive(Debug, Parse, PartialEq)]
 #[nommy(suffix = Tag<",">)]
-#[nommy(ignore_whitespace = "all")]
+#[nommy(ignore = WhiteSpaces)]
 struct NamedField {
     #[nommy(parser = Letters)]
     name: String,
@@ -26,7 +26,7 @@ struct NamedField {
 
 #[derive(Debug, Parse, PartialEq)]
 #[nommy(prefix = Tag<"struct">)]
-#[nommy(ignore_whitespace)]
+#[nommy(ignore = WhiteSpaces)]
 struct StructUnnamed {
     #[nommy(parser = Letters)]
     name: String,
@@ -37,7 +37,7 @@ struct StructUnnamed {
 
 #[derive(Debug, Parse, PartialEq)]
 #[nommy(suffix = Option<Tag<",">>)]
-#[nommy(ignore_whitespace = "all")]
+#[nommy(ignore = WhiteSpaces)]
 struct UnnamedField {
     #[nommy(parser = Letters)]
     ty: String,
@@ -45,7 +45,7 @@ struct UnnamedField {
 
 #[derive(Debug, Parse, PartialEq)]
 #[nommy(prefix = Tag<"enum">)]
-#[nommy(ignore_whitespace)]
+#[nommy(ignore = WhiteSpaces)]
 struct Enum {
     #[nommy(parser = Letters)]
     name: String,
@@ -55,7 +55,7 @@ struct Enum {
 }
 
 #[derive(Debug, Parse, PartialEq)]
-#[nommy(ignore_whitespace = "all")]
+#[nommy(ignore = WhiteSpaces)]
 struct Variant {
     #[nommy(parser = Letters)]
     name: String,
@@ -64,15 +64,15 @@ struct Variant {
 }
 #[derive(Debug, Parse, PartialEq)]
 enum VariantType {
-    #[nommy(ignore_whitespace = "all")]
+    #[nommy(ignore = WhiteSpaces)]
     Struct(#[nommy(prefix = Tag<"{">, suffix = Tag<"}">)] Vec<NamedField>),
 
     #[nommy(suffix = Tag<",">)]
-    #[nommy(ignore_whitespace = "all")]
+    #[nommy(ignore = WhiteSpaces)]
     Tuple(#[nommy(prefix = Tag<"(">, suffix = Tag<")">)] Vec<UnnamedField>),
-    
+
     #[nommy(suffix = Tag<",">)]
-    #[nommy(ignore_whitespace = "all")]
+    #[nommy(ignore = WhiteSpaces)]
     Unit,
 }
 

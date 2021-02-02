@@ -2,14 +2,14 @@ use proc_macro2::{Delimiter, TokenStream, TokenTree};
 
 #[derive(Default, Debug, Clone)]
 pub struct GlobalAttr {
-    pub ignore_whitespace: Option<IgnoreWS>,
+    pub ignore: Vec<syn::Type>,
     pub debug: bool,
     pub prefix: Option<syn::Type>,
     pub suffix: Option<syn::Type>,
     pub parse_type: Option<syn::Type>,
 }
 
-fn parse_type_into(ty: &mut Option<syn::Type>, mut tokens: proc_macro2::token_stream::IntoIter) {
+fn parse_type(mut tokens: proc_macro2::token_stream::IntoIter) -> syn::Type {
     match tokens.next() {
         Some(TokenTree::Punct(p)) => {
             if p.as_char() != '=' {
@@ -22,7 +22,7 @@ fn parse_type_into(ty: &mut Option<syn::Type>, mut tokens: proc_macro2::token_st
     let mut stream = TokenStream::new();
     stream.extend(tokens);
 
-    *ty = Some(syn::parse2(stream).expect("could not parse type"));
+    syn::parse2(stream).expect("could not parse type")
 }
 
 impl GlobalAttr {
@@ -76,52 +76,19 @@ impl GlobalAttr {
         let mut tokens = tokens.into_iter();
         let ident = match tokens.next() {
             Some(TokenTree::Ident(i)) => i,
-            _ => panic!("expected ident")
+            _ => panic!("expected ident"),
         };
 
         match ident.to_string().as_ref() {
-            "ignore_whitespace" => self.parse_ignore_ws(tokens),
-            "prefix" => parse_type_into(&mut self.prefix, tokens),
-            "suffix" => parse_type_into(&mut self.suffix, tokens),
-            "parse_type" => parse_type_into(&mut self.parse_type, tokens),
+            "ignore" => self.ignore.push(parse_type(tokens)),
+            "prefix" => self.prefix = Some(parse_type(tokens)),
+            "suffix" => self.suffix = Some(parse_type(tokens)),
+            "parse_type" => self.parse_type = Some(parse_type(tokens)),
             "debug" => self.debug = true,
             s => panic!("unknown parameter {}", s),
         }
     }
-
-    pub fn parse_ignore_ws(&mut self, mut tokens: proc_macro2::token_stream::IntoIter) {
-        match tokens.next() {
-            None => {
-                self.ignore_whitespace = Some(IgnoreWS::All);
-                return
-            }
-            Some(TokenTree::Punct(p)) => {
-                if p.as_char() != '=' {
-                    panic!("expected an '=' to follow")
-                }
-            }
-            _ => panic!("expected an '=' to follow"),
-        }
-
-        match tokens.next() {
-            Some(TokenTree::Literal(s)) => {
-                match s.to_string().as_ref() {
-                    "\"spaces\"" => self.ignore_whitespace = Some(IgnoreWS::Spaces),
-                    "\"all\"" => self.ignore_whitespace = Some(IgnoreWS::All),
-                    _ => panic!("unsupported term. can be \"spaces\" or \"all\"")
-                }
-            }
-            _ => panic!("unsupported term. can be \"spaces\" or \"all\"")
-        }
-    }
 }
-
-#[derive(Debug, Clone)]
-pub enum IgnoreWS {
-    Spaces,
-    All,
-}
-
 #[derive(Default, Debug, Clone)]
 pub struct FieldAttr {
     pub prefix: Option<syn::Type>,
@@ -187,13 +154,13 @@ impl FieldAttr {
         let mut tokens = tokens.into_iter();
         let ident = match tokens.next() {
             Some(TokenTree::Ident(i)) => i,
-            _ => panic!("expected ident")
+            _ => panic!("expected ident"),
         };
 
         match ident.to_string().as_ref() {
-            "prefix" => parse_type_into(&mut self.prefix, tokens),
-            "suffix" => parse_type_into(&mut self.suffix, tokens),
-            "parser" => parse_type_into(&mut self.parser, tokens),
+            "prefix" => self.prefix = Some(parse_type(tokens)),
+            "suffix" => self.suffix = Some(parse_type(tokens)),
+            "parser" => self.parser = Some(parse_type(tokens)),
             s => panic!("unknown parameter {}", s),
         }
     }

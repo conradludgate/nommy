@@ -1,3 +1,5 @@
+//! Basic Parsers over byte data
+
 mod tag;
 pub use tag::*;
 mod one_of;

@@ -1,3 +1,5 @@
+//! Basic Parsers over string data
+
 mod tag;
 pub use tag::*;
 mod one_of;
@@ -106,6 +108,9 @@ impl Parse<char> for WhiteSpace {
     }
 }
 
+pub type WhiteSpaces = Vec<WhiteSpace>;
+pub type Spaces = Vec<Space>;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -113,7 +118,7 @@ mod tests {
     #[test]
     fn parse_spaces() {
         let mut input = " \t \t   \t\t  \t.".chars().into_buf();
-        let output = Vec::<Space>::parse(&mut input).unwrap();
+        let output = Spaces::parse(&mut input).unwrap();
         assert_eq!(output.len(), 12);
         assert_eq!(input.next(), Some('.'));
     }
@@ -121,7 +126,7 @@ mod tests {
     fn peek_spaces() {
         let mut input = " \t \t   \t\t  \t.".chars().into_buf();
         let mut cursor = input.cursor();
-        assert!(Vec::<Space>::peek(&mut cursor));
+        assert!(Spaces::peek(&mut cursor));
         assert_eq!(cursor.next(), Some('.'));
     }
 

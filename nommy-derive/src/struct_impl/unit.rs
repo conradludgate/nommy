@@ -70,7 +70,7 @@ impl ToTokens for Unit {
 
         tokens.extend(quote!{
             #[automatically_derived]
-            impl<#generic: Clone, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
+            impl<#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
             where #(
                 #parse_wc: ::nommy::Parse<#generic>,
             )* {
@@ -81,7 +81,7 @@ impl ToTokens for Unit {
             }
 
             #[automatically_derived]
-            impl<#generic: Clone, #(#args),*> ::nommy::Peek<#generic> for #name<#(#args),*>
+            impl<#generic, #(#args),*> ::nommy::Peek<#generic> for #name<#(#args),*>
             where #(
                 #peek_wc: ::nommy::Peek<#generic>,
             )* {

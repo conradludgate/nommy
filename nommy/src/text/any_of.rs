@@ -31,8 +31,7 @@ impl<const CHARS: &'static str> Peek<char> for AnyOf<CHARS> {
             if !OneOf::<CHARS>::peek(&mut cursor) {
                 break;
             }
-            let skip = cursor.close();
-            input.fast_forward(skip);
+            cursor.fast_forward_parent()
         }
         true
     }
@@ -82,8 +81,7 @@ impl<const CHARS: &'static str> Peek<char> for WhileNot1<CHARS> {
             if OneOf::<CHARS>::peek(&mut cursor) {
                 break;
             }
-            let skip = cursor.close();
-            input.fast_forward(skip);
+            cursor.fast_forward_parent()
         }
         true
     }
@@ -137,8 +135,7 @@ impl<const CHARS: &'static str> Peek<char> for AnyOf1<CHARS> {
             if !OneOf::<CHARS>::peek(&mut cursor) {
                 break;
             }
-            let skip = cursor.close();
-            input.fast_forward(skip);
+            cursor.fast_forward_parent()
         }
         true
     }
@@ -189,8 +186,7 @@ impl<const CHAR_RANGE: RangeInclusive<char>> Peek<char> for AnyInRange<CHAR_RANG
             if !OneInRange::<CHAR_RANGE>::peek(&mut cursor) {
                 break;
             }
-            let skip = cursor.close();
-            input.fast_forward(skip);
+            cursor.fast_forward_parent()
         }
         true
     }

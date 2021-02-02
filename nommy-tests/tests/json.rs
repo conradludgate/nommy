@@ -4,7 +4,7 @@ use nommy::{text::*, *};
 
 #[derive(Debug, PartialEq, Parse)]
 #[nommy(suffix = Tag<",">, parse_type = char)]
-#[nommy(ignore_whitespace)]
+#[nommy(ignore = WhiteSpaces)]
 enum JSON {
     #[nommy(prefix = Tag<"null">)]
     Null,
@@ -20,7 +20,7 @@ enum JSON {
 }
 
 #[derive(Debug, PartialEq, Parse)]
-#[nommy(ignore_whitespace, parse_type = char)]
+#[nommy(ignore = WhiteSpaces, parse_type = char)]
 struct Record {
     #[nommy(parser = StringParser)]
     #[nommy(suffix = Tag<":">)]

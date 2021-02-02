@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-use crate::attr::{FieldAttr, IgnoreWS};
+use crate::attr::{FieldAttr};
 
 #[derive(Debug, Clone)]
 pub struct NamedField {
@@ -130,28 +130,18 @@ impl<'a, P: PTokens> FunctionBuilder<'a, P> {
     pub fn new(
         wc: &'a mut Vec<syn::Type>,
         generic: &'a syn::Type,
-        ignore_ws: &Option<IgnoreWS>,
+        ignore: &Vec<syn::Type>,
     ) -> Self {
-        let after_each = match &ignore_ws {
-            Some(ws) => {
-                let ty: syn::Type = match ws {
-                    IgnoreWS::Spaces => {
-                        syn::parse2(quote! {::std::vec::Vec<::nommy::text::Space>}).unwrap()
-                    }
-                    IgnoreWS::All => {
-                        syn::parse2(quote! {::std::vec::Vec<::nommy::text::WhiteSpace>}).unwrap()
-                    }
-                };
-                wc.push(ty.clone());
-                P::tokens(
-                    &ty,
-                    &generic,
-                    "parsing whitespace should not fail, but did",
-                    false,
-                )
-            }
-            None => Default::default(),
-        };
+        let mut after_each = TokenStream::new();
+        for ty in ignore {
+            wc.push(ty.clone());
+            after_each.extend(P::tokens(
+                &ty,
+                &generic,
+                "parsing whitespace should not fail, but did",
+                false,
+            ))
+        }
 
         FunctionBuilder {
             wc,

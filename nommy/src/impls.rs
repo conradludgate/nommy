@@ -1,3 +1,6 @@
+//! Implemtations of [Parse], [Peek] and [Process] for types in
+//! the rust standard library
+
 use crate::*;
 use std::{fmt, mem::MaybeUninit};
 
@@ -15,8 +18,7 @@ impl<P: Peek<T>, T: Clone> Peek<T> for Option<P> {
         let mut cursor = input.cursor();
 
         if P::peek(&mut cursor) {
-            let skip = cursor.close();
-            input.fast_forward(skip);
+            cursor.fast_forward_parent()
         }
 
         // Option should always return true for peek
@@ -51,8 +53,7 @@ impl<P: Peek<T>, T: Clone> Peek<T> for Vec<P> {
             if !P::peek(&mut cursor) {
                 break;
             }
-            let skip = cursor.close();
-            input.fast_forward(skip);
+            cursor.fast_forward_parent()
         }
         true
     }
@@ -110,8 +111,7 @@ impl<P: Peek<T>, T: Clone> Peek<T> for Vec1<P> {
             if !P::peek(&mut cursor) {
                 break;
             }
-            let skip = cursor.close();
-            input.fast_forward(skip);
+            cursor.fast_forward_parent()
         }
 
         true

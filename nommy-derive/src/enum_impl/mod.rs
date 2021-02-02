@@ -66,18 +66,18 @@ impl ToTokens for Enum {
         let mut peek_wc: Vec<_> = variant_peek_wc.iter().flatten().cloned().collect();
 
         let mut parse_builder =
-            FunctionBuilder::<Parser>::new(&mut parse_wc, generic, &attrs.ignore_whitespace);
+            FunctionBuilder::<Parser>::new(&mut parse_wc, generic, &attrs.ignore);
         let parse_prefix = parse_builder.fix(&attrs.prefix, "prefix", name.to_string());
         let parse_suffix = parse_builder.fix(&attrs.suffix, "suffix", name.to_string());
 
         let mut peek_builder =
-            FunctionBuilder::<Peeker>::new(&mut peek_wc, generic, &attrs.ignore_whitespace);
+            FunctionBuilder::<Peeker>::new(&mut peek_wc, generic, &attrs.ignore);
         let peek_prefix = peek_builder.fix(&attrs.prefix, "prefix", name.to_string());
         let peek_suffix = peek_builder.fix(&attrs.suffix, "suffix", name.to_string());
 
         tokens.extend(quote!{
             #[automatically_derived]
-            impl <#generic: Clone, #(#args),*> ::nommy::Peek<#generic> for #name<#(#args),*>
+            impl <#generic, #(#args),*> ::nommy::Peek<#generic> for #name<#(#args),*>
             where #(
                 #peek_wc: ::nommy::Peek<#generic>,
             )* {
@@ -95,7 +95,7 @@ impl ToTokens for Enum {
             }
 
             #[automatically_derived]
-            impl <#generic: Clone, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
+            impl <#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
             where #(
                 #parse_wc: ::nommy::Parse<#generic>,
             )* {
@@ -130,7 +130,7 @@ impl ToTokens for Enum {
                         #variant_parse_impls
                     }
 
-                    fn #var_names_peek<#generic: Clone> (input: &mut impl ::nommy::Buffer<#generic>) -> bool
+                    fn #var_names_peek<#generic> (input: &mut impl ::nommy::Buffer<#generic>) -> bool
                     where #(
                         #variant_peek_wc: ::nommy::Peek<#generic>,
                     )* {

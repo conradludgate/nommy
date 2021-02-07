@@ -17,9 +17,9 @@ use super::OneOf;
 /// ```
 pub struct AnyOf<const CHARS: &'static str>(String);
 
-impl<const CHARS: &'static str> Into<String> for AnyOf<CHARS> {
-    fn into(self) -> String {
-        self.0
+impl<const CHARS: &'static str> From<AnyOf<CHARS>> for String {
+    fn from(v: AnyOf<CHARS>) -> Self {
+        v.0
     }
 }
 
@@ -64,9 +64,9 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf<CHARS> {
 /// ```
 pub struct WhileNot1<const CHARS: &'static str>(String);
 
-impl<const CHARS: &'static str> Into<String> for WhileNot1<CHARS> {
-    fn into(self) -> String {
-        self.0
+impl<const CHARS: &'static str> From<WhileNot1<CHARS>> for String {
+    fn from(v: WhileNot1<CHARS>) -> Self {
+        v.0
     }
 }
 
@@ -117,9 +117,9 @@ impl<const CHARS: &'static str> Parse<char> for WhileNot1<CHARS> {
 /// ```
 pub struct AnyOf1<const CHARS: &'static str>(String);
 
-impl<const CHARS: &'static str> Into<String> for AnyOf1<CHARS> {
-    fn into(self) -> String {
-        self.0
+impl<const CHARS: &'static str> From<AnyOf1<CHARS>> for String {
+    fn from(v: AnyOf1<CHARS>) -> Self {
+        v.0
     }
 }
 
@@ -171,9 +171,9 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf1<CHARS> {
 /// ```
 pub struct AnyInRange<const CHAR_RANGE: RangeInclusive<char>>(String);
 
-impl<const CHAR_RANGE: RangeInclusive<char>> Into<String> for AnyInRange<CHAR_RANGE> {
-    fn into(self) -> String {
-        self.0
+impl<const CHAR_RANGE: RangeInclusive<char>> From<AnyInRange<CHAR_RANGE>> for String {
+    fn from(v: AnyInRange<CHAR_RANGE>) -> Self {
+        v.0
     }
 }
 

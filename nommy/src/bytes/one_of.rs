@@ -26,9 +26,9 @@ impl<const BYTES: &'static [u8]> fmt::Display for OneOfError<BYTES> {
 /// ```
 pub struct OneOf<const BYTES: &'static [u8]>(u8);
 
-impl<const BYTES: &'static [u8]> Into<u8> for OneOf<BYTES> {
-    fn into(self) -> u8 {
-        self.0
+impl<const BYTES: &'static [u8]> From<OneOf<BYTES>> for u8 {
+    fn from(v: OneOf<BYTES>) -> Self {
+        v.0
     }
 }
 
@@ -86,9 +86,9 @@ impl<const BYTE_RANGE: RangeInclusive<u8>> fmt::Display for OneInRangeError<BYTE
 /// ```
 pub struct OneInRange<const BYTE_RANGE: RangeInclusive<u8>>(u8);
 
-impl<const BYTE_RANGE: RangeInclusive<u8>> Into<u8> for OneInRange<BYTE_RANGE> {
-    fn into(self) -> u8 {
-        self.0
+impl<const BYTE_RANGE: RangeInclusive<u8>> From<OneInRange<BYTE_RANGE>> for u8 {
+    fn from(v: OneInRange<BYTE_RANGE>) -> Self {
+        v.0
     }
 }
 

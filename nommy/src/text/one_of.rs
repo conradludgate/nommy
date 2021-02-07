@@ -12,9 +12,9 @@ use std::{fmt, ops::RangeInclusive};
 /// ```
 pub struct OneOf<const CHARS: &'static str>(char);
 
-impl<const CHARS: &'static str> Into<char> for OneOf<CHARS> {
-    fn into(self) -> char {
-        self.0
+impl<const CHARS: &'static str> From<OneOf<CHARS>> for char {
+    fn from(v: OneOf<CHARS>) -> Self {
+        v.0
     }
 }
 
@@ -75,9 +75,9 @@ impl<const CHAR_RANGE: RangeInclusive<char>> fmt::Display for OneInRangeError<CH
 /// ```
 pub struct OneInRange<const CHAR_RANGE: RangeInclusive<char>>(char);
 
-impl<const CHAR_RANGE: RangeInclusive<char>> Into<char> for OneInRange<CHAR_RANGE> {
-    fn into(self) -> char {
-        self.0
+impl<const CHAR_RANGE: RangeInclusive<char>> From<OneInRange<CHAR_RANGE>> for char {
+    fn from(v: OneInRange<CHAR_RANGE>) -> Self {
+        v.0
     }
 }
 

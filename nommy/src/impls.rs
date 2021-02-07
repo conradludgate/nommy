@@ -86,9 +86,9 @@ impl<P> AsMut<Vec<P>> for Vec1<P> {
     }
 }
 
-impl<P> Into<Vec<P>> for Vec1<P> {
-    fn into(self) -> Vec<P> {
-        self.0
+impl<P> From<Vec1<P>> for Vec<P> {
+    fn from(v: Vec1<P>) -> Self {
+        v.0
     }
 }
 

@@ -13,9 +13,9 @@ use super::OneOf;
 /// ```
 pub struct AnyOf1<const BYTES: &'static [u8]>(Vec<u8>);
 
-impl<const BYTES: &'static [u8]> Into<Vec<u8>> for AnyOf1<BYTES> {
-    fn into(self) -> Vec<u8> {
-        self.0
+impl<const BYTES: &'static [u8]> From<AnyOf1<BYTES>> for Vec<u8> {
+    fn from(v: AnyOf1<BYTES>) -> Self {
+        v.0
     }
 }
 

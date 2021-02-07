@@ -7,8 +7,8 @@ use std::{fmt, ops::RangeInclusive};
 /// ```
 /// use nommy::{Parse, IntoBuf, text::OneOf};
 /// let mut buffer = "-".chars().into_buf();
-/// let c = OneOf::<"-_">::parse(&mut buffer).unwrap();
-/// assert_eq!(c.into(), '-');
+/// let c: char = OneOf::<"-_">::parse(&mut buffer).unwrap().into();
+/// assert_eq!(c, '-');
 /// ```
 pub struct OneOf<const CHARS: &'static str>(char);
 
@@ -70,8 +70,8 @@ impl<const CHAR_RANGE: RangeInclusive<char>> fmt::Display for OneInRangeError<CH
 /// ```
 /// use nommy::{Parse, IntoBuf, text::OneInRange};
 /// let mut buffer = "12".chars().into_buf();
-/// let c = OneInRange::<{'0'..='9'}>::parse(&mut buffer).unwrap();
-/// assert_eq!(c.into(), '1');
+/// let c: char = OneInRange::<{'0'..='9'}>::parse(&mut buffer).unwrap().into();
+/// assert_eq!(c, '1');
 /// ```
 pub struct OneInRange<const CHAR_RANGE: RangeInclusive<char>>(char);
 
@@ -110,8 +110,8 @@ impl<const CHAR_RANGE: RangeInclusive<char>> Parse<char> for OneInRange<CHAR_RAN
 /// ```
 /// use nommy::{Parse, IntoBuf, text::OneLowercase};
 /// let mut buffer = "helloWorld".chars().into_buf();
-/// let c = OneLowercase::parse(&mut buffer).unwrap();
-/// assert_eq!(c.into(), 'h');
+/// let c: char = OneLowercase::parse(&mut buffer).unwrap().into();
+/// assert_eq!(c, 'h');
 /// ```
 pub type OneLowercase = OneInRange<{ 'a'..='z' }>;
 
@@ -120,8 +120,8 @@ pub type OneLowercase = OneInRange<{ 'a'..='z' }>;
 /// ```
 /// use nommy::{Parse, IntoBuf, text::OneUppercase};
 /// let mut buffer = "HELLOworld".chars().into_buf();
-/// let c = OneUppercase::parse(&mut buffer).unwrap();
-/// assert_eq!(c.into(), 'H');
+/// let c: char = OneUppercase::parse(&mut buffer).unwrap().into();
+/// assert_eq!(c, 'H');
 /// ```
 pub type OneUppercase = OneInRange<{ 'A'..='Z' }>;
 
@@ -130,7 +130,7 @@ pub type OneUppercase = OneInRange<{ 'A'..='Z' }>;
 /// ```
 /// use nommy::{Parse, IntoBuf, text::OneDigits};
 /// let mut buffer = "1024$".chars().into_buf();
-/// let c = OneDigits::parse(&mut buffer).unwrap();
-/// assert_eq!(c.into(), '1');
+/// let c: char = OneDigits::parse(&mut buffer).unwrap().into();
+/// assert_eq!(c, '1');
 /// ```
 pub type OneDigits = OneInRange<{ '0'..='9' }>;

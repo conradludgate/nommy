@@ -1,6 +1,6 @@
 [package]
 name = "nommy_derive"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Conrad Ludgate <conradludgate@gmail.com>"]
 edition = "2018"
 description = "derive(Parse)"
@@ -13,5 +13,5 @@ proc-macro = true
 
 [dependencies]
 quote = "1.0"
-syn = { version = "1.0", features = ["full", "extra-traits"] }
+syn = "1.0"
 proc-macro2 = "1.0"

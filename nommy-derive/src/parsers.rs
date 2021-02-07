@@ -3,9 +3,8 @@ use std::convert::TryFrom;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-use crate::attr::FieldAttr;
+use crate::attr::{FieldAttr, VecFieldAttr};
 
-#[derive(Debug, Clone)]
 pub struct NamedField {
     pub attrs: FieldAttr,
     pub name: syn::Ident,
@@ -36,7 +35,6 @@ impl TryFrom<syn::Field> for UnnamedField {
     }
 }
 
-#[derive(Debug, Clone)]
 pub struct UnnamedField {
     pub attrs: FieldAttr,
     pub ty: syn::Type,
@@ -147,7 +145,7 @@ impl<'a> FunctionBuilder<'a> {
             let parser: Option<&syn::Type> = (&attrs.vec.parser).into();
             let parser = parser.unwrap();
             self.parse_where(&parser);
-            tokens.extend(parser_parse_vec_tokens(&name, &parser, &self.generic));
+            tokens.extend(parser_parse_vec_tokens(&name, &attrs.vec, &self.generic));
         } else {
             let parser: Option<&syn::Type> = (&attrs.parser).into();
             let parser = parser.unwrap_or(&ty);
@@ -219,12 +217,14 @@ fn parser_peek_tokens(ty: &syn::Type, generic: &syn::Type, error: &str) -> Token
     }
 }
 /// section of a parser impl
-fn parser_parse_vec_tokens(name: &syn::Ident, ty: &syn::Type, generic: &syn::Type) -> TokenStream {
+fn parser_parse_vec_tokens(name: &syn::Ident, attrs: &VecFieldAttr, generic: &syn::Type) -> TokenStream {
+    let parser: Option<&syn::Type> = (&attrs.parser).into();
+    let parser = parser.unwrap();
     quote! {
         let mut #name = ::std::vec::Vec::new();
         loop {
             let mut cursor = input.cursor();
-            match <#ty as ::nommy::Parse<#generic>>::parse(&mut cursor) {
+            match <#parser as ::nommy::Parse<#generic>>::parse(&mut cursor) {
                 Ok(p) => #name.push(p.into()),
                 _ => break,
             }

@@ -1,6 +1,6 @@
 use proc_macro2::{Delimiter, Span, TokenStream, TokenTree};
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default)]
 pub struct GlobalAttr {
     pub ignore: Vec<syn::Type>,
     pub debug: bool,
@@ -105,14 +105,14 @@ impl GlobalAttr {
         Ok(())
     }
 }
-#[derive(Default, Debug, Clone)]
+#[derive(Default)]
 pub struct FieldAttr {
     pub prefix: Option<syn::Type>,
     pub suffix: Option<syn::Type>,
     pub parser: Option<syn::Type>,
     pub vec: VecFieldAttr,
 }
-#[derive(Default, Debug, Clone)]
+#[derive(Default)]
 pub struct VecFieldAttr {
     pub count: Option<syn::Expr>,
     pub min: Option<syn::Expr>,

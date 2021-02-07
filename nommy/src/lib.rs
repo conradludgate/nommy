@@ -61,8 +61,8 @@
 
 mod buffer;
 pub use buffer::*;
-mod impls;
 pub mod bytes;
+mod impls;
 pub mod text;
 
 use eyre::Context;
@@ -139,7 +139,8 @@ where
     I: IntoBuf,
     <I::Iter as Iterator>::Item: Clone,
 {
-    P::parse(&mut iter.into_buf())
+    let mut buffer = iter.into_buf();
+    P::parse(&mut buffer)
 }
 
 /// `parse_terminated` takes the given iterator, putting it through [`P::parse`](Parse::parse),
@@ -183,34 +184,17 @@ where
 /// let mut buffer = ".".chars().into_buf();
 /// Tag::<".">::parse(&mut buffer).unwrap();
 /// ```
-pub trait Parse<T>: Sized + Peek<T> {
+pub trait Parse<T>: Sized {
     /// Parse the input buffer, returning Ok if the value could be parsed,
     /// Otherwise, returns a meaningful error
     ///
     /// # Errors
     /// Will return an error if the parser fails to interpret the input at any point
     fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self>;
-}
 
-/// A weaker version of [`Parse`]. It reads from the input,
-/// returning whether the equivalent [`Parse::parse`] function
-/// would return Ok.
-///
-/// ```
-/// use nommy::{Peek, Buffer, IntoBuf, text::Tag};
-/// let mut buffer = ".".chars().into_buf();
-/// assert!(Tag::<".">::peek(&mut buffer));
-/// ```
-pub trait Peek<T>: Sized {
     /// Peek reads the input buffer, returning true if the value could be found,
     /// Otherwise, returns false
-    fn peek(input: &mut impl Buffer<T>) -> bool;
+    fn peek(input: &mut impl Buffer<T>) -> bool {
+        Self::parse(input).is_ok()
+    }
 }
-
-// /// Process is a standard interface to map a generated AST from the output of [Parse::parse].
-// /// All types that implement [Parse] should implement this trait.
-// pub trait Process {
-//     type Output;
-
-//     fn process(self) -> Self::Output;
-// }

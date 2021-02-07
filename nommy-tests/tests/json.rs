@@ -30,26 +30,6 @@ struct Record {
 }
 
 struct StringParser(String);
-impl Peek<char> for StringParser {
-    fn peek(input: &mut impl Buffer<char>) -> bool {
-        if input.next() != Some('\"') {
-            return false;
-        }
-
-        let mut escaped = false;
-        for c in input {
-            if escaped {
-                escaped = false;
-                continue;
-            }
-            if c == '\"' {
-                break;
-            }
-        }
-
-        true
-    }
-}
 impl Parse<char> for StringParser {
     fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         if input.next() != Some('\"') {
@@ -76,6 +56,31 @@ impl Parse<char> for StringParser {
         }
 
         Ok(StringParser(output))
+    }
+
+    fn peek(input: &mut impl Buffer<char>) -> bool {
+        if input.next() != Some('\"') {
+            return false;
+        }
+
+        let mut escaped = false;
+        for c in input {
+            match (c, escaped) {
+                ('\"', true) => escaped = false,
+                ('n', true) => escaped = false,
+                ('r', true) => escaped = false,
+                ('t', true) => escaped = false,
+                ('\\', true) => escaped = false,
+                (_, true) => return false,
+                ('\"', false) => return true,
+                ('\\', false) => {
+                    escaped = true;
+                }
+                _ => {}
+            }
+        }
+
+        false
     }
 }
 impl Into<String> for StringParser {

@@ -194,7 +194,7 @@ impl<'a> FunctionBuilder<'a> {
 }
 
 fn peek_where_tokens(ty: &syn::Type, generic: &syn::Type) -> TokenStream {
-    quote! {#ty: ::nommy::Peek<#generic>,}
+    quote! {#ty: ::nommy::Parse<#generic>,}
 }
 fn parse_where_tokens(ty: &syn::Type, generic: &syn::Type) -> TokenStream {
     quote! {#ty: ::nommy::Parse<#generic>,}
@@ -213,7 +213,7 @@ fn parser_parse_tokens(
 /// section of a parser impl
 fn parser_peek_tokens(ty: &syn::Type, generic: &syn::Type, error: &str) -> TokenStream {
     quote! {
-        if !(<#ty as ::nommy::Peek<#generic>>::peek(input)) { return Err(::nommy::eyre::eyre!(#error)) }
+        if !(<#ty as ::nommy::Parse<#generic>>::peek(input)) { return Err(::nommy::eyre::eyre!(#error)) }
     }
 }
 /// section of a parser impl
@@ -235,7 +235,7 @@ fn parser_parse_vec_tokens(name: &syn::Ident, attrs: &VecFieldAttr, generic: &sy
 /// section of a peeker impl
 fn peeker_peek_tokens(ty: &syn::Type, generic: &syn::Type) -> TokenStream {
     quote! {
-        if !(<#ty as ::nommy::Peek<#generic>>::peek(input)) { return false }
+        if !(<#ty as ::nommy::Parse<#generic>>::peek(input)) { return false }
     }
 }
 /// section of a peeker impl
@@ -252,7 +252,7 @@ fn peeker_peek_vec_tokens(ty: &syn::Type, generic: &syn::Type) -> TokenStream {
     quote! {
         loop {
             let mut cursor = input.cursor();
-            if !<#ty as ::nommy::Peek<#generic>>::peek(&mut cursor) {
+            if !<#ty as ::nommy::Parse<#generic>>::peek(&mut cursor) {
                 break;
             }
             cursor.fast_forward_parent()
@@ -277,7 +277,7 @@ pub fn ignore_impl(
         ignore_impl.extend(quote! {
             {
                 let mut cursor = input.cursor();
-                if <#ty as ::nommy::Peek<#generic>>::peek(&mut cursor) {
+                if <#ty as ::nommy::Parse<#generic>>::peek(&mut cursor) {
                     cursor.fast_forward_parent();
                     return true
                 }
@@ -286,7 +286,10 @@ pub fn ignore_impl(
     }
     let ignore_impl = quote! {
         struct __ParseIgnore;
-        impl<#generic> ::nommy::Peek<#generic> for __ParseIgnore where #ignore_wc {
+        impl<#generic> ::nommy::Parse<#generic> for __ParseIgnore where #ignore_wc {
+            fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
+                unimplemented!()
+            }
             fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
                 #ignore_impl
 
@@ -296,7 +299,7 @@ pub fn ignore_impl(
     };
 
     let after_each = quote! {
-        <::std::vec::Vec<__ParseIgnore> as ::nommy::Peek<#generic>>::peek(input);
+        <::std::vec::Vec<__ParseIgnore> as ::nommy::Parse<#generic>>::peek(input);
     };
 
     (ignore_impl, after_each)

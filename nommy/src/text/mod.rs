@@ -7,13 +7,20 @@ pub use one_of::*;
 mod many;
 pub use many::*;
 
-use crate::{Buffer, Parse, Peek, eyre};
+use crate::{eyre, Buffer, Parse};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 /// Parses newline `"\n"` or carriage return `"\r\n"`
 pub struct LineEnding;
 
-impl Peek<char> for LineEnding {
+impl Parse<char> for LineEnding {
+    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
+        match Self::peek(input) {
+            true => Ok(Self),
+            false => Err(eyre::eyre!("could not parse line ending")),
+        }
+    }
+
     fn peek(input: &mut impl Buffer<char>) -> bool {
         match input.next() {
             Some('\n') => true,
@@ -23,68 +30,40 @@ impl Peek<char> for LineEnding {
     }
 }
 
-impl Parse<char> for LineEnding {
-    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
-        match input.next() {
-            Some('\n') => Ok(Self),
-            Some('\r') => {
-                if input.next() == Some('\n') {
-                    Ok(Self)
-                } else {
-                    Err(eyre::eyre!("could not parse lineending"))
-                }
-            }
-            _ => Err(eyre::eyre!("could not parse lineending")),
-        }
-    }
-}
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 /// Type that parses any space characters (tabs, spaces)
 pub struct Space;
 
-impl Peek<char> for Space {
+impl Parse<char> for Space {
+    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
+        match Self::peek(input) {
+            true => Ok(Self),
+            false => Err(eyre::eyre!("could not parse space")),
+        }
+    }
+
     fn peek(input: &mut impl Buffer<char>) -> bool {
         matches!(input.next(), Some(' ') | Some('\t'))
     }
 }
 
-impl Parse<char> for Space {
-    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
-        match input.next() {
-            Some(' ') | Some('\t') => Ok(Self),
-            _ => Err(eyre::eyre!("could not parse space or tab")),
-        }
-    }
-}
-
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 /// Type that parses any whitespace characters (tabs, spaces, newlines and carriage returns)
 pub struct WhiteSpace;
 
-impl Peek<char> for WhiteSpace {
+impl Parse<char> for WhiteSpace {
+    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
+        match Self::peek(input) {
+            true => Ok(Self),
+            false => Err(eyre::eyre!("could not parse whitespace")),
+        }
+    }
+
     fn peek(input: &mut impl Buffer<char>) -> bool {
         match input.next() {
             Some(' ') | Some('\t') | Some('\n') => true,
             Some('\r') => input.next() == Some('\n'),
             _ => false,
-        }
-    }
-}
-
-impl Parse<char> for WhiteSpace {
-    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
-        match input.next() {
-            Some(' ') | Some('\t') | Some('\n') => Ok(Self),
-            Some('\r') => {
-                if input.next() == Some('\n') {
-                    Ok(Self)
-                } else {
-                    Err(eyre::eyre!("could not parse whitespace"))
-                }
-            }
-            _ => Err(eyre::eyre!("could not parse whitespace")),
         }
     }
 }

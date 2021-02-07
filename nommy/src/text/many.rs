@@ -1,4 +1,4 @@
-use crate::{eyre, Buffer, Parse, Peek};
+use crate::{eyre, Buffer, Parse};
 
 use super::OneOf;
 
@@ -19,19 +19,6 @@ impl<const CHARS: &'static str> From<AnyOf<CHARS>> for String {
     }
 }
 
-impl<const CHARS: &'static str> Peek<char> for AnyOf<CHARS> {
-    fn peek(input: &mut impl Buffer<char>) -> bool {
-        loop {
-            let mut cursor = input.cursor();
-            if !OneOf::<CHARS>::peek(&mut cursor) {
-                break;
-            }
-            cursor.fast_forward_parent()
-        }
-        true
-    }
-}
-
 impl<const CHARS: &'static str> Parse<char> for AnyOf<CHARS> {
     fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         let mut output = String::new();
@@ -46,6 +33,17 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf<CHARS> {
         }
 
         Ok(Self(output))
+    }
+
+    fn peek(input: &mut impl Buffer<char>) -> bool {
+        loop {
+            let mut cursor = input.cursor();
+            if !OneOf::<CHARS>::peek(&mut cursor) {
+                break;
+            }
+            cursor.fast_forward_parent()
+        }
+        true
     }
 }
 
@@ -66,22 +64,6 @@ impl<const CHARS: &'static str> From<WhileNot1<CHARS>> for String {
     }
 }
 
-impl<const CHARS: &'static str> Peek<char> for WhileNot1<CHARS> {
-    fn peek(input: &mut impl Buffer<char>) -> bool {
-        if OneOf::<CHARS>::peek(input) {
-            return false;
-        }
-        loop {
-            let mut cursor = input.cursor();
-            if OneOf::<CHARS>::peek(&mut cursor) {
-                break;
-            }
-            cursor.fast_forward_parent()
-        }
-        true
-    }
-}
-
 impl<const CHARS: &'static str> Parse<char> for WhileNot1<CHARS> {
     fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         let mut output = String::new();
@@ -99,6 +81,20 @@ impl<const CHARS: &'static str> Parse<char> for WhileNot1<CHARS> {
             Ok(Self(output))
         }
     }
+
+    fn peek(input: &mut impl Buffer<char>) -> bool {
+        if OneOf::<CHARS>::peek(input) {
+            return false;
+        }
+        loop {
+            let mut cursor = input.cursor();
+            if OneOf::<CHARS>::peek(&mut cursor) {
+                break;
+            }
+            cursor.fast_forward_parent()
+        }
+        true
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -115,22 +111,6 @@ pub struct AnyOf1<const CHARS: &'static str>(String);
 impl<const CHARS: &'static str> From<AnyOf1<CHARS>> for String {
     fn from(v: AnyOf1<CHARS>) -> Self {
         v.0
-    }
-}
-
-impl<const CHARS: &'static str> Peek<char> for AnyOf1<CHARS> {
-    fn peek(input: &mut impl Buffer<char>) -> bool {
-        if !OneOf::<CHARS>::peek(input) {
-            return false;
-        }
-        loop {
-            let mut cursor = input.cursor();
-            if !OneOf::<CHARS>::peek(&mut cursor) {
-                break;
-            }
-            cursor.fast_forward_parent()
-        }
-        true
     }
 }
 
@@ -152,6 +132,20 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf1<CHARS> {
         } else {
             Ok(Self(output))
         }
+    }
+
+    fn peek(input: &mut impl Buffer<char>) -> bool {
+        if !OneOf::<CHARS>::peek(input) {
+            return false;
+        }
+        loop {
+            let mut cursor = input.cursor();
+            if !OneOf::<CHARS>::peek(&mut cursor) {
+                break;
+            }
+            cursor.fast_forward_parent()
+        }
+        true
     }
 }
 

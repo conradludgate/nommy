@@ -1,6 +1,6 @@
 use std::iter::FromIterator;
 
-use crate::{eyre, Buffer, Parse, Peek};
+use crate::{eyre, Buffer, Parse};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 /// `Tag` is a generic type that implements [`Parse`] to match the given string exactly
@@ -13,12 +13,6 @@ use crate::{eyre, Buffer, Parse, Peek};
 /// ```
 pub struct Tag<const TAG: &'static str>;
 
-impl<const TAG: &'static str> Peek<char> for Tag<TAG> {
-    fn peek(input: &mut impl Buffer<char>) -> bool {
-        TAG.chars().eq(input.take(TAG.len()))
-    }
-}
-
 impl<const TAG: &'static str> Parse<char> for Tag<TAG> {
     fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         let s = String::from_iter(input.take(TAG.len()));
@@ -27,6 +21,10 @@ impl<const TAG: &'static str> Parse<char> for Tag<TAG> {
         } else {
             Err(eyre::eyre!("failed to parse tag {:?}, found {:?}", TAG, s))
         }
+    }
+
+    fn peek(input: &mut impl Buffer<char>) -> bool {
+        TAG.chars().eq(input.take(TAG.len()))
     }
 }
 

@@ -1,17 +1,12 @@
 use std::str::FromStr;
 
-use nommy::{Buffer, Parse, Peek, parse, text::{AnyOf1, Tag, WhileNot1, Space}};
+use nommy::{Buffer, Parse, parse, text::{AnyOf1, Tag, WhileNot1, Space}};
 
 type Letters = AnyOf1<"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_">;
 type Path = AnyOf1<"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ/%-_+1234567890">;
 type Digits = AnyOf1<"0123456789">;
 
 pub struct Number(usize);
-impl Peek<char> for Number {
-    fn peek(input: &mut impl Buffer<char>) -> bool {
-        Digits::peek(input)
-    }
-}
 impl Parse<char> for Number
 {
     fn parse(input: &mut impl Buffer<char>) -> nommy::eyre::Result<Self> {
@@ -19,6 +14,10 @@ impl Parse<char> for Number
         let string: String = digits.into();
         let u = usize::from_str(&string)?;
         Ok(Number(u))
+    }
+
+    fn peek(input: &mut impl Buffer<char>) -> bool {
+        Digits::peek(input)
     }
 }
 impl Into<usize> for Number {

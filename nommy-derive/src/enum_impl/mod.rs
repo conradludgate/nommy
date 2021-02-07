@@ -96,26 +96,8 @@ impl ToTokens for Enum {
 
         tokens.extend(quote!{
             #[automatically_derived]
-            impl <#generic, #(#args),*> ::nommy::Peek<#generic> for #name<#(#args),*>
-            where #peek_wc {
-                fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
-                    #ignore
-
-                    #peek_prefix
-
-                    if #( !Self::#var_names_peek(&mut input.cursor()) )&&* {
-                        return false;
-                    }
-
-                    #peek_suffix
-
-                    true
-                }
-            }
-
-            #[automatically_derived]
             impl <#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
-            where #parse_wc {
+            where #parse_wc #peek_wc {
                 fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
                     use ::nommy::eyre::WrapErr;
                     #ignore
@@ -133,6 +115,20 @@ impl ToTokens for Enum {
                     #parse_suffix
 
                     Ok(result)
+                }
+
+                fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
+                    #ignore
+
+                    #peek_prefix
+
+                    if #( !Self::#var_names_peek(&mut input.cursor()) )&&* {
+                        return false;
+                    }
+
+                    #peek_suffix
+
+                    true
                 }
             }
 

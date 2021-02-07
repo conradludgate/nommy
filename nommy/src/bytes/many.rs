@@ -1,4 +1,4 @@
-use crate::{eyre, Buffer, Parse, Peek};
+use crate::{eyre, Buffer, Parse};
 
 use super::OneOf;
 
@@ -19,22 +19,6 @@ impl<const BYTES: &'static [u8]> From<AnyOf1<BYTES>> for Vec<u8> {
     }
 }
 
-impl<const BYTES: &'static [u8]> Peek<u8> for AnyOf1<BYTES> {
-    fn peek(input: &mut impl Buffer<u8>) -> bool {
-        if !OneOf::<BYTES>::peek(input) {
-            return false;
-        }
-        loop {
-            let mut cursor = input.cursor();
-            if !OneOf::<BYTES>::peek(&mut cursor) {
-                break;
-            }
-            cursor.fast_forward_parent()
-        }
-        true
-    }
-}
-
 impl<const BYTES: &'static [u8]> Parse<u8> for AnyOf1<BYTES> {
     fn parse(input: &mut impl Buffer<u8>) -> eyre::Result<Self> {
         let mut output = Vec::new();
@@ -52,5 +36,19 @@ impl<const BYTES: &'static [u8]> Parse<u8> for AnyOf1<BYTES> {
         } else {
             Ok(Self(output))
         }
+    }
+
+    fn peek(input: &mut impl Buffer<u8>) -> bool {
+        if !OneOf::<BYTES>::peek(input) {
+            return false;
+        }
+        loop {
+            let mut cursor = input.cursor();
+            if !OneOf::<BYTES>::peek(&mut cursor) {
+                break;
+            }
+            cursor.fast_forward_parent()
+        }
+        true
     }
 }

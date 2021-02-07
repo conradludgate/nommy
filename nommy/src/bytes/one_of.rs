@@ -1,4 +1,4 @@
-use crate::{eyre, Buffer, Parse, Peek};
+use crate::{eyre, Buffer, Parse};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 /// `OneOf` is a generic type that implements [`Parse`] to match one character within the given string
@@ -17,15 +17,6 @@ impl<const BYTES: &'static [u8]> From<OneOf<BYTES>> for u8 {
     }
 }
 
-impl<const BYTES: &'static [u8]> Peek<u8> for OneOf<BYTES> {
-    fn peek(input: &mut impl Buffer<u8>) -> bool {
-        match input.next() {
-            Some(c) => BYTES.contains(&c),
-            None => false,
-        }
-    }
-}
-
 impl<const BYTES: &'static [u8]> Parse<u8> for OneOf<BYTES> {
     fn parse(input: &mut impl Buffer<u8>) -> eyre::Result<Self> {
         match input.next() {
@@ -41,6 +32,13 @@ impl<const BYTES: &'static [u8]> Parse<u8> for OneOf<BYTES> {
                 }
             }
             None => Err(eyre::eyre!("error parsing one of {:?}, reached EOF", BYTES)),
+        }
+    }
+
+    fn peek(input: &mut impl Buffer<u8>) -> bool {
+        match input.next() {
+            Some(c) => BYTES.contains(&c),
+            None => false,
         }
     }
 }

@@ -1,9 +1,21 @@
 //! Implemtations of [`Parse`] and [`Peek`] for types in
 //! the rust standard library
-use crate::{eyre, Buffer, Context, Parse, Peek};
+use crate::{eyre, Buffer, Context, Parse};
 use std::mem::MaybeUninit;
 
-impl<P: Peek<T>, T: Clone> Peek<T> for Option<P> {
+/// Result is `None` if parsing `P` fails, otherwise, result is `Some(p)`
+impl<P: Parse<T>, T> Parse<T> for Option<P> {
+    fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self> {
+        let mut cursor = input.cursor();
+        match P::parse(&mut cursor) {
+            Ok(p) => {
+                cursor.fast_forward_parent();
+                Ok(Some(p))
+            }
+            Err(_) => Ok(None),
+        }
+    }
+
     fn peek(input: &mut impl Buffer<T>) -> bool {
         let mut cursor = input.cursor();
 
@@ -16,35 +28,8 @@ impl<P: Peek<T>, T: Clone> Peek<T> for Option<P> {
     }
 }
 
-/// Result is `None` if parsing `P` fails, otherwise, result is `Some(p)`
-impl<P: Parse<T>, T: Clone> Parse<T> for Option<P> {
-    fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self> {
-        let mut cursor = input.cursor();
-        match P::parse(&mut cursor) {
-            Ok(p) => {
-                cursor.fast_forward_parent();
-                Ok(Some(p))
-            }
-            Err(_) => Ok(None),
-        }
-    }
-}
-
-impl<P: Peek<T>, T> Peek<T> for Vec<P> {
-    fn peek(input: &mut impl Buffer<T>) -> bool {
-        loop {
-            let mut cursor = input.cursor();
-            if !P::peek(&mut cursor) {
-                break;
-            }
-            cursor.fast_forward_parent()
-        }
-        true
-    }
-}
-
 /// Repeatedly attempts to parse `P`, Result is all successful attempts
-impl<P: Parse<T>, T: Clone> Parse<T> for Vec<P> {
+impl<P: Parse<T>, T> Parse<T> for Vec<P> {
     fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self> {
         let mut output = Self::new();
         loop {
@@ -57,6 +42,17 @@ impl<P: Parse<T>, T: Clone> Parse<T> for Vec<P> {
         }
 
         Ok(output)
+    }
+
+    fn peek(input: &mut impl Buffer<T>) -> bool {
+        loop {
+            let mut cursor = input.cursor();
+            if !P::peek(&mut cursor) {
+                break;
+            }
+            cursor.fast_forward_parent()
+        }
+        true
     }
 }
 
@@ -82,27 +78,9 @@ impl<P> From<Vec1<P>> for Vec<P> {
     }
 }
 
-impl<P: Peek<T>, T: Clone> Peek<T> for Vec1<P> {
-    fn peek(input: &mut impl Buffer<T>) -> bool {
-        if !P::peek(input) {
-            return false;
-        }
-
-        loop {
-            let mut cursor = input.cursor();
-            if !P::peek(&mut cursor) {
-                break;
-            }
-            cursor.fast_forward_parent()
-        }
-
-        true
-    }
-}
-
 /// Repeatedly attempt to parse `P`, Result is all successful attempts
 /// Must parse `P` at least once
-impl<P: Parse<T>, T: Clone> Parse<T> for Vec1<P> {
+impl<P: Parse<T>, T> Parse<T> for Vec1<P> {
     fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self> {
         let mut output = vec![P::parse(input)?];
         loop {
@@ -116,14 +94,18 @@ impl<P: Parse<T>, T: Clone> Parse<T> for Vec1<P> {
 
         Ok(Self(output))
     }
-}
 
-impl<P: Peek<T>, T, const N: usize> Peek<T> for [P; N] {
     fn peek(input: &mut impl Buffer<T>) -> bool {
-        for _ in 0..N {
-            if !P::peek(input) {
-                return false;
+        if !P::peek(input) {
+            return false;
+        }
+
+        loop {
+            let mut cursor = input.cursor();
+            if !P::peek(&mut cursor) {
+                break;
             }
+            cursor.fast_forward_parent()
         }
 
         true
@@ -150,6 +132,16 @@ impl<P: Parse<T>, T, const N: usize> Parse<T> for [P; N] {
 
             Ok(MaybeUninit::array_assume_init(output))
         }
+    }
+
+    fn peek(input: &mut impl Buffer<T>) -> bool {
+        for _ in 0..N {
+            if !P::peek(input) {
+                return false;
+            }
+        }
+
+        true
     }
 }
 

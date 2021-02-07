@@ -1,23 +1,32 @@
 # Peekers
 
-[`Peek`] is a lot like [`Parse`]. It's definition is almost exactly the same, but instead of returning `Result<Self>`, it returns `bool`. It's supposed to be a faster method of determining whether a given input could be parsed. A lot of the built in parsers utilise [`Peek`] under the hood to resolve branches
+Hidden in the [`Parse`] definition in the previous chapter is the `peek` method. It's definition is almost exactly the same as `parse`, but instead of returning `Result<Self>`, it returns `bool`. It's supposed to be a faster method of determining whether a given input could be parsed. A lot of the built in parsers utilise [`peek`] under the hood to resolve branches.
 
 ```rust
-pub trait Peek<T>: Sized {
-    fn peek(input: &mut impl Buffer<T>) -> bool;
+pub trait Parse<T>: Sized {
+    #fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self>;
+    #
+    fn peek(input: &mut impl Buffer<T>) -> bool {
+        // Default impl - override for better performance
+        Self::parse(input).is_ok()
+    }
 }
 ```
 
 ## Example
 
-This is the same example from the Parsers section, but instead implementing [`Peek`].
+This is the same example from the [`Parsers`] section, but instead implementing `peek`.
 It follows a very similar implementation, but avoids a lot of the heavy work, such as dealing with errors
 and saving the chars to the string buffer
 
 ```rust
 /// StringParser parses a code representation of a string
 struct StringParser(String);
-impl Peek<char> for StringParser {
+impl Parse<char> for StringParser {
+    #fn parse(input: &mut impl Buffer<char>) -> Result<Self> {
+        #unimplemented!()
+    #}
+    #
     fn peek(input: &mut impl Buffer<char>) -> bool {
         // ensure the first character is a quote mark
         if input.next() != Some('\"') {
@@ -49,4 +58,4 @@ impl Peek<char> for StringParser {
 
 [`Buffer`]: https://docs.rs/nommy/latest/nommy/trait.Buffer.html
 [`Parse`]: https://docs.rs/nommy/latest/nommy/trait.Parse.html
-[`Peek`]: https://docs.rs/nommy/latest/nommy/trait.Peek.html
+[`Parsers`]: parsers.html

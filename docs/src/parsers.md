@@ -5,6 +5,11 @@
 ```rust
 pub trait Parse<T>: Sized {
     fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self>;
+    #
+    # // Covered in the next section
+    #fn peek(input: &mut impl Buffer<T>) -> bool {
+        #Self::parse(input).is_ok()
+    #}
 }
 ```
 

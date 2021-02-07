@@ -193,7 +193,8 @@ pub trait Parse<T>: Sized {
     fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self>;
 
     /// Peek reads the input buffer, returning true if the value could be found,
-    /// Otherwise, returns false
+    /// Otherwise, returns false.
+    /// Not required, but usually provides better performance if implemented
     fn peek(input: &mut impl Buffer<T>) -> bool {
         Self::parse(input).is_ok()
     }

@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="nommy.html" class="active"><strong aria-hidden="true">1.</strong> nommy</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="nommy.html" class="active"><strong aria-hidden="true">1.</strong> nommy</a></li><li class="chapter-item expanded "><a href="ideology.html"><strong aria-hidden="true">2.</strong> Ideology</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="buffers.html"><strong aria-hidden="true">2.1.</strong> Buffers</a></li><li class="chapter-item expanded "><a href="parsers.html"><strong aria-hidden="true">2.2.</strong> Parsers</a></li><li class="chapter-item expanded "><a href="peekers.html"><strong aria-hidden="true">2.3.</strong> Peekers</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -165,6 +165,57 @@
                     <main>
                         <h1><a class="header" href="#nommy" id="nommy">nommy</a></h1>
 <p><strong>nommy</strong> is a type based parsing crate that features a derive macro to help you utilise the power of rust and nommy</p>
+<pre><pre class="playground"><code class="language-rust edition2018">use nommy::{parse, text::*, Parse};
+
+type Letters = AnyOf1&lt;&quot;abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ&quot;&gt;;
+
+#[derive(Debug, Parse, PartialEq)]
+#[nommy(prefix = Tag&lt;&quot;struct&quot;&gt;)]
+#[nommy(ignore = WhiteSpace)]
+struct StructNamed {
+    #[nommy(parser = Letters)]
+    name: String,
+
+    #[nommy(prefix = Tag&lt;&quot;{&quot;&gt;, suffix = Tag&lt;&quot;}&quot;&gt;)]
+    fields: Vec&lt;NamedField&gt;,
+}
+
+#[derive(Debug, Parse, PartialEq)]
+#[nommy(suffix = Tag&lt;&quot;,&quot;&gt;)]
+#[nommy(ignore = WhiteSpace)]
+struct NamedField {
+    #[nommy(parser = Letters)]
+    name: String,
+
+    #[nommy(prefix = Tag&lt;&quot;:&quot;&gt;, parser = Letters)]
+    ty: String,
+}
+
+fn main() {
+    let input = &quot;struct Foo {
+        bar: Abc,
+        baz: Xyz,
+    }&quot;;
+
+    let struct_: StructNamed = parse(input.chars()).unwrap();
+    assert_eq!(
+        struct_,
+        StructNamed {
+            name: &quot;Foo&quot;.to_string(),
+            fields: vec![
+                NamedField {
+                    name: &quot;bar&quot;.to_string(),
+                    ty: &quot;Abc&quot;.to_string(),
+                },
+                NamedField {
+                    name: &quot;baz&quot;.to_string(),
+                    ty: &quot;Xyz&quot;.to_string(),
+                },
+            ]
+        }
+    );
+}
+</code></pre></pre>
 
                     </main>
 
@@ -172,6 +223,10 @@
                         <!-- Mobile navigation buttons -->
                         
 
+                        
+                            <a rel="next" href="ideology.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
                         
 
                         <div style="clear: both"></div>
@@ -182,6 +237,10 @@
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
 
+                
+                    <a rel="next" href="ideology.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
                 
             </nav>
 

@@ -3,10 +3,8 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title></title>
+        <title>Buffers - Type Based parsing with Nommy</title>
         
-        
-        <base href="/">
         
 
 
@@ -97,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="nommy.html"><strong aria-hidden="true">1.</strong> nommy</a></li><li class="chapter-item expanded "><a href="ideology.html"><strong aria-hidden="true">2.</strong> Ideology</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="buffers.html"><strong aria-hidden="true">2.1.</strong> Buffers</a></li><li class="chapter-item expanded "><a href="parsers.html"><strong aria-hidden="true">2.2.</strong> Parsers</a></li><li class="chapter-item expanded "><a href="peekers.html"><strong aria-hidden="true">2.3.</strong> Peekers</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="nommy.html"><strong aria-hidden="true">1.</strong> nommy</a></li><li class="chapter-item expanded "><a href="ideology.html"><strong aria-hidden="true">2.</strong> Ideology</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="buffers.html" class="active"><strong aria-hidden="true">2.1.</strong> Buffers</a></li><li class="chapter-item expanded "><a href="parsers.html"><strong aria-hidden="true">2.2.</strong> Parsers</a></li><li class="chapter-item expanded "><a href="peekers.html"><strong aria-hidden="true">2.3.</strong> Peekers</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -165,15 +163,81 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#document-not-found-404" id="document-not-found-404">Document not found (404)</a></h1>
-<p>This URL is invalid, sorry. Please use the navigation bar or search to continue.</p>
+                        <h1><a class="header" href="#buffers" id="buffers">Buffers</a></h1>
+<p><a href="https://docs.rs/nommy/latest/nommy/trait.Buffer.html"><code>Buffer</code></a> is trait that wraps an <code>Iterator</code>. It extends upon this by requiring two extra methods</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>/// eagerly drops the first `n` elements in the buffer
+fn fast_forward(&amp;mut self, n: usize);
+
+/// finds the `i`th element in the iterator, storing any read elements into a buffer for later access
+fn peek_ahead(&amp;mut self, i: usize) -&gt; Option&lt;T&gt;
+<span class="boring">}
+</span></code></pre></pre>
+<p>With these two method, the trait can implement a third method, <code>cursor</code> which returns a new <a href="https://docs.rs/nommy/latest/nommy/trait.Buffer.html"><code>Buffer</code></a> type <a href="https://docs.rs/nommy/latest/nommy/struct.Cursor.html"><code>Cursor</code></a>.</p>
+<p><a href="https://docs.rs/nommy/latest/nommy/struct.Cursor.html"><code>Cursor</code></a> reads from a buffer only using <code>peek_ahead</code>.
+It ensures that any data read through the buffer can be read again in future.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use nommy::{Buffer, IntoBuf};
+let mut buffer = (0..).into_buf();
+let mut cursor1 = buffer.cursor();
+
+// cursors act exactly like an iterator
+assert_eq!(cursor1.next(), Some(0));
+assert_eq!(cursor1.next(), Some(1));
+
+// cursors can be made from other cursors
+let mut cursor2 = cursor1.cursor();
+assert_eq!(cursor2.next(), Some(2));
+assert_eq!(cursor2.next(), Some(3));
+
+// child cursors do not move the parent's iterator position
+assert_eq!(cursor1.next(), Some(2));
+
+assert_eq!(buffer.next(), Some(0));
+<span class="boring">}
+</span></code></pre></pre>
+<p>If you read from a cursor and decide that you won't need to re-read that contents again,
+you can call <code>fast_forward_parent</code>. This takes how many elements ahead the <a href="https://docs.rs/nommy/latest/nommy/struct.Cursor.html"><code>Cursor</code></a> has read,
+and calls the parent buffer's <code>fast_forward</code> method with it.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use nommy::{Buffer, IntoBuf};
+let mut input = &quot;foobar&quot;.chars().into_buf();
+let mut cursor = input.cursor();
+assert_eq!(cursor.next(), Some('f'));
+assert_eq!(cursor.next(), Some('o'));
+assert_eq!(cursor.next(), Some('o'));
+
+// Typically, the next three calls to `next` would repeat
+// the first three calls because cursors read non-destructively.
+// However, this method allows to drop the already-read contents
+cursor.fast_forward_parent();
+assert_eq!(input.next(), Some('b'));
+assert_eq!(input.next(), Some('a'));
+assert_eq!(input.next(), Some('r'));
+<span class="boring">}
+</span></code></pre></pre>
+<p>The standard implementation of <a href="Buffer"><code>Buffer</code></a> is <a href="https://docs.rs/nommy/latest/nommy/struct.Buf.html"><code>Buf</code></a>, and can be created from any type that implements <code>IntoIterator</code>.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
+                            <a rel="prev" href="ideology.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
 
+                        
+                            <a rel="next" href="parsers.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
                         
 
                         <div style="clear: both"></div>
@@ -183,7 +247,15 @@
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
+                    <a rel="prev" href="ideology.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
 
+                
+                    <a rel="next" href="parsers.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
                 
             </nav>
 

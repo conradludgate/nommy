@@ -3,10 +3,8 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title></title>
+        <title>Peekers - Type Based parsing with Nommy</title>
         
-        
-        <base href="/">
         
 
 
@@ -97,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="nommy.html"><strong aria-hidden="true">1.</strong> nommy</a></li><li class="chapter-item expanded "><a href="ideology.html"><strong aria-hidden="true">2.</strong> Ideology</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="buffers.html"><strong aria-hidden="true">2.1.</strong> Buffers</a></li><li class="chapter-item expanded "><a href="parsers.html"><strong aria-hidden="true">2.2.</strong> Parsers</a></li><li class="chapter-item expanded "><a href="peekers.html"><strong aria-hidden="true">2.3.</strong> Peekers</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="nommy.html"><strong aria-hidden="true">1.</strong> nommy</a></li><li class="chapter-item expanded "><a href="ideology.html"><strong aria-hidden="true">2.</strong> Ideology</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="buffers.html"><strong aria-hidden="true">2.1.</strong> Buffers</a></li><li class="chapter-item expanded "><a href="parsers.html"><strong aria-hidden="true">2.2.</strong> Parsers</a></li><li class="chapter-item expanded "><a href="peekers.html" class="active"><strong aria-hidden="true">2.3.</strong> Peekers</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -165,13 +163,63 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#document-not-found-404" id="document-not-found-404">Document not found (404)</a></h1>
-<p>This URL is invalid, sorry. Please use the navigation bar or search to continue.</p>
+                        <h1><a class="header" href="#peekers" id="peekers">Peekers</a></h1>
+<p><a href="https://docs.rs/nommy/latest/nommy/trait.Peek.html"><code>Peek</code></a> is a lot like <a href="https://docs.rs/nommy/latest/nommy/trait.Parse.html"><code>Parse</code></a>. It's definition is almost exactly the same, but instead of returning <code>Result&lt;Self&gt;</code>, it returns <code>bool</code>. It's supposed to be a faster method of determining whether a given input could be parsed. A lot of the built in parsers utilise <a href="https://docs.rs/nommy/latest/nommy/trait.Peek.html"><code>Peek</code></a> under the hood to resolve branches</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub trait Peek&lt;T&gt;: Sized {
+    fn peek(input: &amp;mut impl Buffer&lt;T&gt;) -&gt; bool;
+}
+<span class="boring">}
+</span></code></pre></pre>
+<h2><a class="header" href="#example" id="example">Example</a></h2>
+<p>This is the same example from the Parsers section, but instead implementing <a href="https://docs.rs/nommy/latest/nommy/trait.Peek.html"><code>Peek</code></a>.
+It follows a very similar implementation, but avoids a lot of the heavy work, such as dealing with errors
+and saving the chars to the string buffer</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>/// StringParser parses a code representation of a string
+struct StringParser(String);
+impl Peek&lt;char&gt; for StringParser {
+    fn peek(input: &amp;mut impl Buffer&lt;char&gt;) -&gt; bool {
+        // ensure the first character is a quote mark
+        if input.next() != Some('\&quot;') {
+            return false;
+        }
+
+        let mut escaped = false;
+
+        // read from the input until the ending quote is found
+        for c in input {
+            match (c, escaped) {
+                ('\&quot;', true) =&gt; { escaped = false }
+                ('n', true) =&gt; { escaped = false }
+                ('r', true) =&gt; { escaped = false }
+                ('t', true) =&gt; { escaped = false }
+                ('\\', true) =&gt; { escaped = false }
+                (c, true) =&gt; return false,
+                ('\&quot;', false) =&gt; return true,
+                ('\\', false) =&gt; { escaped = true; }
+                _ =&gt; {},
+            }
+        }
+
+        false
+    }
+}
+<span class="boring">}
+</span></code></pre></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
+                        
+                            <a rel="prev" href="parsers.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
                         
 
                         
@@ -182,6 +230,10 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+                    <a rel="prev" href="parsers.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
                 
 
                 

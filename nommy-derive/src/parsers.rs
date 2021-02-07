@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, marker::PhantomData};
+use std::convert::TryFrom;
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -72,74 +72,26 @@ impl FieldType for UnnamedField {
     }
 }
 
-pub trait PTokens {
-    fn tokens(ty: &syn::Type, generic: &syn::Type, error: impl AsRef<str>) -> TokenStream;
-    fn tokens_field(
-        name: &syn::Ident,
-        ty: &syn::Type,
-        generic: &syn::Type,
-        error: impl AsRef<str>,
-    ) -> TokenStream;
-}
-
-pub struct Parser;
-impl PTokens for Parser {
-    fn tokens(ty: &syn::Type, generic: &syn::Type, error: impl AsRef<str>) -> TokenStream {
-        let error = error.as_ref();
-        quote! {
-            <#ty as ::nommy::Parse<#generic>>::parse(input).wrap_err(#error)?;
-        }
-    }
-    fn tokens_field(
-        name: &syn::Ident,
-        ty: &syn::Type,
-        generic: &syn::Type,
-        error: impl AsRef<str>,
-    ) -> TokenStream {
-        let error = error.as_ref();
-        quote! {
-            let #name = <#ty as ::nommy::Parse<#generic>>::parse(input).wrap_err(#error)?.into();
-        }
-    }
-}
-
-pub struct Peeker;
-impl PTokens for Peeker {
-    fn tokens(ty: &syn::Type, generic: &syn::Type, _: impl AsRef<str>) -> TokenStream {
-        quote! {
-            if !(<#ty as ::nommy::Peek<#generic>>::peek(input)) { return false }
-        }
-    }
-    fn tokens_field(
-        _: &syn::Ident,
-        ty: &syn::Type,
-        generic: &syn::Type,
-        error: impl AsRef<str>,
-    ) -> TokenStream {
-        Self::tokens(ty, generic, error)
-    }
-}
-
-pub struct FunctionBuilder<'a, P: PTokens> {
-    pub wc: &'a mut Vec<syn::Type>,
+pub struct FunctionBuilder<'a> {
+    pub wc: &'a mut TokenStream,
     pub generic: &'a syn::Type,
     after_each: TokenStream,
-    _phantom: PhantomData<P>,
 }
 
-impl<'a, P: PTokens> FunctionBuilder<'a, P> {
-    pub fn new(
-        wc: &'a mut Vec<syn::Type>,
-        generic: &'a syn::Type,
-        ignore: &Vec<syn::Type>,
-    ) -> Self {
+impl<'a> FunctionBuilder<'a> {
+    pub fn new_parser(wc: &'a mut TokenStream, generic: &'a syn::Type, ignore: &Vec<syn::Type>) -> Self {
         let mut after_each = TokenStream::new();
+
+        // TODO: reform this
+        // Ignore should take in the single tokens,
+        // then generate an enum of these tokens
+        // then parse many of them
         for ty in ignore {
-            wc.push(ty.clone());
-            after_each.extend(P::tokens(
+            wc.extend(peek_where_tokens(&ty, &generic));
+            after_each.extend(parser_peek_tokens(
                 &ty,
                 &generic,
-                "parsing whitespace should not fail, but did",
+                "failed to parse 'ignore' tokens",
             ))
         }
 
@@ -147,24 +99,52 @@ impl<'a, P: PTokens> FunctionBuilder<'a, P> {
             wc,
             generic,
             after_each,
-            _phantom: PhantomData,
+        }
+    }
+    pub fn new_peeker(wc: &'a mut TokenStream, generic: &'a syn::Type, ignore: &Vec<syn::Type>) -> Self {
+        let mut after_each = TokenStream::new();
+
+        // TODO: reform this
+        // Ignore should take in the single tokens,
+        // then generate an enum of these tokens
+        // then parse many of them
+        for ty in ignore {
+            wc.extend(peek_where_tokens(&ty, &generic));
+            after_each.extend(peeker_peek_tokens(
+                &ty,
+                &generic,
+            ))
+        }
+
+        FunctionBuilder {
+            wc,
+            generic,
+            after_each,
         }
     }
 
+    fn peek_where(&mut self, ty: &syn::Type) {
+        self.wc.extend(peek_where_tokens(&ty, &self.generic));
+    }
+
+    fn parse_where(&mut self, ty: &syn::Type) {
+        self.wc.extend(parse_where_tokens(&ty, &self.generic));
+    }
+
     // prefix or suffix
-    pub fn fix(
+    pub fn parse_fix(
         &mut self,
         fix: &Option<syn::Type>,
         fix_type: &'static str,
-        type_name: impl AsRef<str>,
+        type_name: &str,
     ) -> TokenStream {
         match fix {
-            Some(prefix) => {
-                self.wc.push(prefix.clone());
-                let mut tokens = P::tokens(
-                    &prefix,
+            Some(fix) => {
+                self.peek_where(&fix);
+                let mut tokens = parser_peek_tokens(
+                    &fix,
                     &self.generic,
-                    format!("failed to parse {} for {}", fix_type, type_name.as_ref()),
+                    &format!("failed to parse {} for {}", fix_type, type_name),
                 );
                 tokens.extend(self.after_each.clone());
                 tokens
@@ -174,60 +154,104 @@ impl<'a, P: PTokens> FunctionBuilder<'a, P> {
     }
 
     // prefix or suffix
-    pub fn field<F: FieldType>(&mut self, field: &F, field_num: usize) -> TokenStream {
+    pub fn peek_fix(&mut self, fix: &Option<syn::Type>) -> TokenStream {
+        match fix {
+            Some(fix) => {
+                self.peek_where(&fix);
+                let mut tokens = peeker_peek_tokens(&fix, &self.generic);
+                tokens.extend(self.after_each.clone());
+                tokens
+            }
+            None => Default::default(),
+        }
+    }
+
+    pub fn parse_field<F: FieldType>(&mut self, field: &F, field_num: usize) -> TokenStream {
         let ty = field.ty();
         let name = field.name(field_num);
         let attrs = field.attrs();
 
         let mut tokens = TokenStream::new();
 
-        tokens.extend(self.fix(&attrs.prefix, "prefix", format!("field `{}`", name)));
+        tokens.extend(self.parse_fix(&attrs.prefix, "prefix", &format!("field `{}`", name)));
 
         let parser = match &attrs.parser {
             Some(p) => p,
             None => ty,
         };
-        self.wc.push(parser.clone());
-        tokens.extend(P::tokens_field(
+        self.parse_where(&parser);
+        tokens.extend(parser_parse_tokens(
             &name,
             &parser,
             &self.generic,
-            format!("failed to parse field `{}`", name),
+            &format!("failed to parse field `{}`", name),
         ));
 
         tokens.extend(self.after_each.clone());
 
-        tokens.extend(self.fix(&attrs.suffix, "suffix", format!("field `{}`", name)));
+        tokens.extend(self.parse_fix(&attrs.suffix, "suffix", &format!("field `{}`", name)));
 
         tokens
     }
 
-    // prefix or suffix
-    pub fn vec_field<F: FieldType>(&mut self, field: &F, field_num: usize) -> TokenStream {
+    pub fn peek_field<F: FieldType>(&mut self, field: &F, _field_num: usize) -> TokenStream {
         let ty = field.ty();
-        let name = field.name(field_num);
         let attrs = field.attrs();
 
         let mut tokens = TokenStream::new();
 
-        tokens.extend(self.fix(&attrs.prefix, "prefix", format!("field `{}`", name)));
+        tokens.extend(self.peek_fix(&attrs.prefix));
 
         let parser = match &attrs.parser {
             Some(p) => p,
             None => ty,
         };
-        self.wc.push(parser.clone());
-        tokens.extend(P::tokens_field(
-            &name,
-            &parser,
-            &self.generic,
-            format!("failed to parse field `{}`", name),
-        ));
+        self.peek_where(&parser);
+        tokens.extend(peeker_peek_tokens(&parser, &self.generic));
 
         tokens.extend(self.after_each.clone());
 
-        tokens.extend(self.fix(&attrs.suffix, "suffix", format!("field `{}`", name)));
+        tokens.extend(self.peek_fix(&attrs.suffix));
 
         tokens
+    }
+}
+
+fn peek_where_tokens(ty: &syn::Type, generic: &syn::Type) -> TokenStream {
+    quote! {#ty: ::nommy::Peek<#generic>,}
+}
+fn parse_where_tokens(ty: &syn::Type, generic: &syn::Type) -> TokenStream {
+    quote! {#ty: ::nommy::Parse<#generic>,}
+}
+/// section of a parser impl
+fn parser_parse_tokens(
+    name: &syn::Ident,
+    ty: &syn::Type,
+    generic: &syn::Type,
+    error: &str,
+) -> TokenStream {
+    quote! {
+        let #name = <#ty as ::nommy::Parse<#generic>>::parse(input).wrap_err(#error)?.into();
+    }
+}
+/// section of a parser impl
+fn parser_peek_tokens(ty: &syn::Type, generic: &syn::Type, error: &str) -> TokenStream {
+    quote! {
+        if !(<#ty as ::nommy::Peek<#generic>>::peek(input)) { return Err(::nommy::eyre::eyre!(#error)) }
+    }
+}
+/// section of a peeker impl
+fn peeker_peek_tokens(ty: &syn::Type, generic: &syn::Type) -> TokenStream {
+    quote! {
+        if !(<#ty as ::nommy::Peek<#generic>>::peek(input)) { return false }
+    }
+}
+/// section of a parser impl
+fn _peeker_parse_tokens(name: &syn::Ident, ty: &syn::Type, generic: &syn::Type) -> TokenStream {
+    quote! {
+        let #name = match <#ty as ::nommy::Parse<#generic>>::parse(input) {
+            Ok(v) => v,
+            _ => return false,
+        };
     }
 }

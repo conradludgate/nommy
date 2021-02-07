@@ -36,7 +36,7 @@ impl FnImpl<NamedField> for Named {
         let name = &self.name;
         quote! {
             Ok(#name {#(
-                #names: #names,
+                #names,
             )*})
         }
     }
@@ -89,9 +89,7 @@ impl ToTokens for Named {
         tokens.extend(quote!{
             #[automatically_derived]
             impl<#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
-            where #(
-                #parse_wc: ::nommy::Parse<#generic>,
-            )* {
+            where #parse_wc {
                 fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
                     use ::nommy::eyre::WrapErr;
                     #parse_fn_impl
@@ -100,15 +98,13 @@ impl ToTokens for Named {
 
             #[automatically_derived]
             impl<#generic, #(#args),*> ::nommy::Peek<#generic> for #name<#(#args),*>
-            where #(
-                #peek_wc: ::nommy::Peek<#generic>,
-            )* {
+            where #peek_wc {
                 fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
                     #peek_fn_impl
                     true
                 }
             }
-        })
+        });
     }
 }
 //         let impl_args = match (attrs.debug, &attrs.parse_type) {

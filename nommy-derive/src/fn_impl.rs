@@ -3,41 +3,12 @@ use quote::{format_ident, quote};
 
 use crate::{
     attr::GlobalAttr,
-    parsers::{FieldType, FunctionBuilder, PTokens, Parser, Peeker},
+    parsers::{FieldType, FunctionBuilder},
 };
 
 pub struct BuildOutput {
     pub fn_impl: TokenStream,
-    pub wc: Vec<syn::Type>,
-}
-
-fn build<T: FieldType, F: FnImpl<T>, P: PTokens>(fn_impl: &F) -> BuildOutput {
-    let mut wc = vec![];
-    let name = fn_impl.name();
-    let attrs = fn_impl.attrs();
-
-    let mut builder =
-        FunctionBuilder::<P>::new(&mut wc, fn_impl.generic(), &attrs.ignore);
-
-    let mut tokens = TokenStream::new();
-
-    tokens.extend(builder.fix(&attrs.prefix, "prefix", format!("{} `{}`", F::TYPE, name)));
-
-    let fields = fn_impl.fields();
-    for (i, field) in fields.iter().enumerate() {
-        if field.attrs().vec.is_some() {
-            tokens.extend(builder.vec_field(field, i))
-        } else {
-            tokens.extend(builder.field(field, i))
-        }
-    }
-
-    tokens.extend(builder.fix(&attrs.suffix, "suffix", format!("{} `{}`", F::TYPE, name)));
-
-    BuildOutput {
-        fn_impl: tokens,
-        wc,
-    }
+    pub wc: TokenStream,
 }
 
 pub trait FnImpl<F: FieldType>: Sized {
@@ -52,13 +23,66 @@ pub trait FnImpl<F: FieldType>: Sized {
     fn result(&self) -> TokenStream;
 
     fn build_parse(&self) -> BuildOutput {
-        let BuildOutput { mut fn_impl, wc } = build::<F, Self, Parser>(&self);
-        fn_impl.extend(self.result());
-        BuildOutput { fn_impl, wc }
+        let mut wc = TokenStream::new();
+        let name = self.name();
+        let attrs = self.attrs();
+
+        let mut builder = FunctionBuilder::new_parser(&mut wc, self.generic(), &attrs.ignore);
+
+        let mut tokens = TokenStream::new();
+
+        tokens.extend(builder.parse_fix(
+            &attrs.prefix,
+            "prefix",
+            &format!("{} `{}`", Self::TYPE, name),
+        ));
+
+        let fields = self.fields();
+        for (i, field) in fields.iter().enumerate() {
+            if field.attrs().vec.is_some() {
+                // tokens.extend(builder.vec_field(field, i))
+            } else {
+                tokens.extend(builder.parse_field(field, i))
+            }
+        }
+
+        tokens.extend(builder.parse_fix(
+            &attrs.suffix,
+            "suffix",
+            &format!("{} `{}`", Self::TYPE, name),
+        ));
+
+        tokens.extend(self.result());
+        BuildOutput {
+            fn_impl: tokens,
+            wc,
+        }
     }
 
     fn build_peek(&self) -> BuildOutput {
-        build::<F, Self, Peeker>(&self)
+        let mut wc = TokenStream::new();
+        let attrs = self.attrs();
+
+        let mut builder = FunctionBuilder::new_peeker(&mut wc, self.generic(), &attrs.ignore);
+
+        let mut tokens = TokenStream::new();
+
+        tokens.extend(builder.peek_fix(&attrs.prefix));
+
+        let fields = self.fields();
+        for (i, field) in fields.iter().enumerate() {
+            if field.attrs().vec.is_some() {
+                // tokens.extend(builder.vec_field(field, i))
+            } else {
+                tokens.extend(builder.peek_field(field, i))
+            }
+        }
+
+        tokens.extend(builder.peek_fix(&attrs.suffix));
+        BuildOutput {
+            fn_impl: tokens,
+            wc,
+        }
     }
 }
 
@@ -81,5 +105,4 @@ pub fn parse_or(parse_type: &Option<syn::Type>) -> syn::Type {
             })
         }
     }
-
 }

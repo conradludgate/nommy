@@ -13,7 +13,7 @@ use unnamed::EnumVariantUnnamed;
 use crate::{
     attr::GlobalAttr,
     fn_impl::{parse_or, BuildOutput, FnImpl},
-    parsers::{FunctionBuilder, Parser, Peeker},
+    parsers::FunctionBuilder,
 };
 
 pub struct Enum {
@@ -63,29 +63,40 @@ impl ToTokens for Enum {
             let BuildOutput { fn_impl, wc } = map_vars! {v => |n| (n, self).build_parse()};
             (fn_impl, wc)
         });
-        let mut parse_wc: Vec<_> = variant_parse_wc.iter().flatten().cloned().collect();
+        let mut parse_wc: TokenStream =
+            variant_parse_wc
+                .clone()
+                .into_iter()
+                .fold(TokenStream::new(), |mut a, b| {
+                    a.extend(b);
+                    a
+                });
 
         let (variant_peek_impls, variant_peek_wc) = map_unzip(vars, |v| {
             let BuildOutput { fn_impl, wc } = map_vars! {v => |n| (n, self).build_peek()};
             (fn_impl, wc)
         });
-        let mut peek_wc: Vec<_> = variant_peek_wc.iter().flatten().cloned().collect();
+        let mut peek_wc: TokenStream =
+            variant_peek_wc
+                .clone()
+                .into_iter()
+                .fold(TokenStream::new(), |mut a, b| {
+                    a.extend(b);
+                    a
+                });
 
-        let mut parse_builder =
-            FunctionBuilder::<Parser>::new(&mut parse_wc, generic, &attrs.ignore);
-        let parse_prefix = parse_builder.fix(&attrs.prefix, "prefix", name.to_string());
-        let parse_suffix = parse_builder.fix(&attrs.suffix, "suffix", name.to_string());
+        let mut parse_builder = FunctionBuilder::new_parser(&mut parse_wc, generic, &attrs.ignore);
+        let parse_prefix = parse_builder.parse_fix(&attrs.prefix, "prefix", &name.to_string());
+        let parse_suffix = parse_builder.parse_fix(&attrs.suffix, "suffix", &name.to_string());
 
-        let mut peek_builder = FunctionBuilder::<Peeker>::new(&mut peek_wc, generic, &attrs.ignore);
-        let peek_prefix = peek_builder.fix(&attrs.prefix, "prefix", name.to_string());
-        let peek_suffix = peek_builder.fix(&attrs.suffix, "suffix", name.to_string());
+        let mut peek_builder = FunctionBuilder::new_peeker(&mut peek_wc, generic, &attrs.ignore);
+        let peek_prefix = peek_builder.peek_fix(&attrs.prefix);
+        let peek_suffix = peek_builder.peek_fix(&attrs.suffix);
 
         tokens.extend(quote!{
             #[automatically_derived]
             impl <#generic, #(#args),*> ::nommy::Peek<#generic> for #name<#(#args),*>
-            where #(
-                #peek_wc: ::nommy::Peek<#generic>,
-            )* {
+            where #peek_wc {
                 fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
                     #peek_prefix
 
@@ -101,9 +112,7 @@ impl ToTokens for Enum {
 
             #[automatically_derived]
             impl <#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
-            where #(
-                #parse_wc: ::nommy::Parse<#generic>,
-            )* {
+            where #parse_wc {
                 fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
                     use ::nommy::eyre::WrapErr;
 
@@ -128,17 +137,13 @@ impl ToTokens for Enum {
             {
                 #(
                     fn #var_names_parse<#generic> (input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self>
-                    where #(
-                        #variant_parse_wc: ::nommy::Parse<#generic>,
-                    )* {
+                    where #variant_parse_wc {
                         use ::nommy::eyre::WrapErr;
                         #variant_parse_impls
                     }
 
                     fn #var_names_peek<#generic> (input: &mut impl ::nommy::Buffer<#generic>) -> bool
-                    where #(
-                        #variant_peek_wc: ::nommy::Peek<#generic>,
-                    )* {
+                    where #variant_peek_wc {
                         #variant_peek_impls
                         true
                     }

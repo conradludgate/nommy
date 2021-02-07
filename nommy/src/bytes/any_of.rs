@@ -6,16 +6,15 @@ use super::OneOf;
 /// AnyOf1 is a generic type that implements Parse to match many characters within the given string
 ///
 /// ```
-/// use nommy::{Parse, Process, IntoBuf, bytes::AnyOf1};
+/// use nommy::{Parse, IntoBuf, bytes::AnyOf1};
 /// let mut buffer = "-_-.".bytes().into_buf();
-/// let c = AnyOf1::<b"-_">::parse(&mut buffer).unwrap();
-/// assert_eq!(c.process(), b"-_-");
+/// let c: Vec<u8> = AnyOf1::<b"-_">::parse(&mut buffer).unwrap().into();
+/// assert_eq!(c, b"-_-");
 /// ```
 pub struct AnyOf1<const BYTES: &'static [u8]>(Vec<u8>);
 
-impl<const BYTES: &'static [u8]> Process for AnyOf1<BYTES> {
-    type Output = Vec<u8>;
-    fn process(self) -> Self::Output {
+impl<const BYTES: &'static [u8]> Into<Vec<u8>> for AnyOf1<BYTES> {
+    fn into(self) -> Vec<u8> {
         self.0
     }
 }
@@ -44,7 +43,7 @@ impl<const BYTES: &'static [u8]> Parse<u8> for AnyOf1<BYTES> {
             output.push(
                 OneOf::<BYTES>::parse(input)
                     .expect("peek succeeded but parse failed")
-                    .process(),
+                    .into(),
             );
         }
 

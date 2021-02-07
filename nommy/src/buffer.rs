@@ -117,7 +117,7 @@ where
     }
 }
 
-/// Cursors are a [Buffer] that non-destructively read from their parent buffers.
+/// Cursors are a [Buffer] that non-destructively read from their parent buffers using [Buffer::peek_ahead]
 /// See [Buffer] documentation for example usage
 pub struct Cursor<'a, T, B: Buffer<T>> {
     buf: &'a mut B,
@@ -126,6 +126,7 @@ pub struct Cursor<'a, T, B: Buffer<T>> {
 }
 
 impl<'a, T, B: Buffer<T>> Cursor<'a, T, B> {
+    /// Create a new cursor over the buffer
     pub fn new(buf: &'a mut B) -> Self {
         Cursor {
             buf,
@@ -134,6 +135,7 @@ impl<'a, T, B: Buffer<T>> Cursor<'a, T, B> {
         }
     }
 
+    /// Drops this cursor and calls [Buffer::fast_forward] on the parent buffer
     pub fn fast_forward_parent(self) {
         self.buf.fast_forward(self.index)
     }

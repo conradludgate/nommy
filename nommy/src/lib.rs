@@ -189,10 +189,10 @@ pub trait Peek<T>: Sized {
     fn peek(input: &mut impl Buffer<T>) -> bool;
 }
 
-/// Process is a standard interface to map a generated AST from the output of [Parse::parse].
-/// All types that implement [Parse] should implement this trait.
-pub trait Process {
-    type Output;
+// /// Process is a standard interface to map a generated AST from the output of [Parse::parse].
+// /// All types that implement [Parse] should implement this trait.
+// pub trait Process {
+//     type Output;
 
-    fn process(self) -> Self::Output;
-}
+//     fn process(self) -> Self::Output;
+// }

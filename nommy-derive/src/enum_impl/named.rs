@@ -20,7 +20,7 @@ impl FnImpl<NamedField> for (&EnumVariantNamed, &Enum) {
         let variant_name = &self.0.name;
         quote! {
             Ok(#enum_name::#variant_name {#(
-                #names: #names.into(),
+                #names: #names,
             )*})
         }
     }

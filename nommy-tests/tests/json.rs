@@ -78,9 +78,8 @@ impl Parse<char> for StringParser {
         Ok(StringParser(output))
     }
 }
-impl Process for StringParser {
-    type Output = String;
-    fn process(self) -> Self::Output {
+impl Into<String> for StringParser {
+    fn into(self) -> String {
         self.0
     }
 }

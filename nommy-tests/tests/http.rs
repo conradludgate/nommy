@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use nommy::{Buffer, Parse, Peek, Process, parse, text::{AnyOf1, Tag, WhileNot1, Spaces}};
+use nommy::{Buffer, Parse, Peek, parse, text::{AnyOf1, Tag, WhileNot1, Spaces}};
 
 type Letters = AnyOf1<"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_">;
 type Path = AnyOf1<"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ/%-_+1234567890">;
@@ -16,19 +16,18 @@ impl Parse<char> for Number
 {
     fn parse(input: &mut impl Buffer<char>) -> nommy::eyre::Result<Self> {
         let digits = Digits::parse(input)?;
-        let string = digits.process();
+        let string: String = digits.into();
         let u = usize::from_str(&string)?;
         Ok(Number(u))
     }
 }
-impl Process for Number {
-    type Output = usize;
-    fn process(self) -> Self::Output {
+impl Into<usize> for Number {
+    fn into(self) -> usize {
         self.0
     }
 }
 
-#[derive(Debug, PartialEq, Parse)]
+#[derive(Debug, Parse)]
 struct HTTP {
     #[nommy(parser = Letters)]
     method: String,
@@ -48,7 +47,7 @@ struct HTTP {
 }
 
 
-#[derive(Debug, PartialEq, Parse)]
+#[derive(Debug, Parse)]
 #[nommy(ignore = Spaces)]
 #[nommy(prefix = Tag<"\n">)]
 struct Header {
@@ -56,11 +55,11 @@ struct Header {
     name: String,
 
     #[nommy(prefix = Tag<":">)]
-    #[nommy(parser = Vec<HeaderValue>)]
+    #[nommy(inner_parser = HeaderValue)]
     values: Vec<String>
 }
 
-#[derive(Debug, PartialEq, Parse)]
+#[derive(Debug, Parse)]
 #[nommy(ignore = Spaces)]
 #[nommy(suffix = Option<Tag<",">>)]
 struct HeaderValue {
@@ -68,9 +67,8 @@ struct HeaderValue {
     value: String,
 }
 
-impl Process for HeaderValue {
-    type Output = String;
-    fn process(self) -> Self::Output {
+impl Into<String> for HeaderValue {
+    fn into(self) -> String {
         self.value
     }
 }

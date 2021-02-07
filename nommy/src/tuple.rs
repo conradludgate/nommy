@@ -60,7 +60,7 @@ impl<$($T),*> Process for ($($T),*) where $($T: Process),* {
             $($T,)*
         ) = self;
         (
-            $($T.process(),)*
+            $($T.into(),)*
         )
     }
 }

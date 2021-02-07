@@ -1,4 +1,4 @@
-use proc_macro2::{Delimiter, TokenStream, TokenTree};
+use proc_macro2::{Delimiter, Span, TokenStream, TokenTree};
 
 #[derive(Default, Debug, Clone)]
 pub struct GlobalAttr {
@@ -9,51 +9,64 @@ pub struct GlobalAttr {
     pub parse_type: Option<syn::Type>,
 }
 
-fn parse_type(mut tokens: proc_macro2::token_stream::IntoIter) -> syn::Type {
+fn parse_type(
+    span: Span,
+    mut tokens: proc_macro2::token_stream::IntoIter,
+) -> syn::Result<syn::Type> {
     match tokens.next() {
         Some(TokenTree::Punct(p)) => {
             if p.as_char() != '=' {
-                panic!("expected an '=' to follow")
+                return Err(syn::Error::new_spanned(p, "expected an '=' to follow"));
             }
         }
-        _ => panic!("expected an '=' to follow"),
+        Some(t) => return Err(syn::Error::new_spanned(t, "expected an '=' to follow")),
+        None => return Err(syn::Error::new(span, "expected an '=' to follow")),
     }
 
     let mut stream = TokenStream::new();
     stream.extend(tokens);
 
-    syn::parse2(stream).expect("could not parse type")
+    syn::parse2(stream)
 }
 
 impl GlobalAttr {
-    pub fn parse_attrs(attrs: Vec<syn::Attribute>) -> Self {
+    pub fn parse_attrs(attrs: Vec<syn::Attribute>) -> syn::Result<Self> {
         let mut output = GlobalAttr::default();
         for attr in attrs {
             if attr.path.is_ident("nommy") {
-                output.parse_attr(attr.tokens);
+                output.parse_attr(attr.tokens)?;
             }
         }
-        output
+        Ok(output)
     }
 
-    pub fn parse_attr(&mut self, tokens: TokenStream) {
+    pub fn parse_attr(&mut self, tokens: TokenStream) -> syn::Result<()> {
         for tt in tokens.into_iter() {
-            let inner = match tt {
+            let (inner, span) = match tt {
                 TokenTree::Group(g) => {
                     if g.delimiter() == Delimiter::Parenthesis {
-                        g.stream()
+                        (g.stream(), g.span())
                     } else {
-                        panic!("unexpected token")
+                        return Err(syn::Error::new_spanned(
+                            g,
+                            "expected parenthesied attribute arguments",
+                        ));
                     }
                 }
-                _ => panic!("unexpected token"),
+                t => {
+                    return Err(syn::Error::new_spanned(
+                        t,
+                        "expected parenthesied attribute arguments",
+                    ))
+                }
             };
 
-            self.parse_args(inner);
+            self.parse_args(span, inner)?;
         }
+        Ok(())
     }
 
-    pub fn parse_args(&mut self, tokens: TokenStream) {
+    pub fn parse_args(&mut self, mut span: Span, tokens: TokenStream) -> syn::Result<()> {
         let mut stream = TokenStream::new();
         for tt in tokens {
             match tt {
@@ -61,7 +74,8 @@ impl GlobalAttr {
                     if p.as_char() == ',' {
                         let mut tmp = TokenStream::new();
                         std::mem::swap(&mut stream, &mut tmp);
-                        self.parse_arg(tmp)
+                        self.parse_arg(span, tmp)?;
+                        span = p.span();
                     } else {
                         stream.extend(vec![TokenTree::Punct(p)])
                     }
@@ -69,24 +83,26 @@ impl GlobalAttr {
                 _ => stream.extend(vec![tt]),
             }
         }
-        self.parse_arg(stream)
+        self.parse_arg(span, stream)
     }
 
-    pub fn parse_arg(&mut self, tokens: TokenStream) {
+    pub fn parse_arg(&mut self, span: Span, tokens: TokenStream) -> syn::Result<()> {
         let mut tokens = tokens.into_iter();
         let ident = match tokens.next() {
             Some(TokenTree::Ident(i)) => i,
-            _ => panic!("expected ident"),
+            Some(t) => return Err(syn::Error::new_spanned(t, "expected ident")),
+            None => return Err(syn::Error::new(span, "expected ident to follow")),
         };
 
         match ident.to_string().as_ref() {
-            "ignore" => self.ignore.push(parse_type(tokens)),
-            "prefix" => self.prefix = Some(parse_type(tokens)),
-            "suffix" => self.suffix = Some(parse_type(tokens)),
-            "parse_type" => self.parse_type = Some(parse_type(tokens)),
+            "ignore" => self.ignore.push(parse_type(ident.span(), tokens)?),
+            "prefix" => self.prefix = Some(parse_type(ident.span(), tokens)?),
+            "suffix" => self.suffix = Some(parse_type(ident.span(), tokens)?),
+            "parse_type" => self.parse_type = Some(parse_type(ident.span(), tokens)?),
             "debug" => self.debug = true,
-            s => panic!("unknown parameter {}", s),
+            _ => return Err(syn::Error::new_spanned(ident, "unknown parameter")),
         }
+        Ok(())
     }
 }
 #[derive(Default, Debug, Clone)]
@@ -101,37 +117,53 @@ pub struct VecFieldAttr {
     pub count: Option<syn::Expr>,
     pub min: Option<syn::Expr>,
     pub max: Option<syn::Expr>,
+    pub parser: Option<syn::Type>,
+}
+
+impl VecFieldAttr {
+    pub fn is_some(&self) -> bool {
+        self.count.is_some() || self.min.is_some() || self.max.is_some() || self.parser.is_some()
+    }
 }
 
 impl FieldAttr {
-    pub fn parse_attrs(attrs: Vec<syn::Attribute>) -> Self {
+    pub fn parse_attrs(attrs: Vec<syn::Attribute>) -> syn::Result<Self> {
         let mut output = FieldAttr::default();
         for attr in attrs {
             if attr.path.is_ident("nommy") {
-                output.parse_attr(attr.tokens);
+                output.parse_attr(attr.tokens)?;
             }
         }
-        output
+        Ok(output)
     }
 
-    pub fn parse_attr(&mut self, tokens: TokenStream) {
+    pub fn parse_attr(&mut self, tokens: TokenStream) -> syn::Result<()> {
         for tt in tokens.into_iter() {
-            let inner = match tt {
+            let (inner, span) = match tt {
                 TokenTree::Group(g) => {
                     if g.delimiter() == Delimiter::Parenthesis {
-                        g.stream()
+                        (g.stream(), g.span())
                     } else {
-                        panic!("unexpected token")
+                        return Err(syn::Error::new_spanned(
+                            g,
+                            "expected parenthesied attribute arguments",
+                        ));
                     }
                 }
-                _ => panic!("unexpected token"),
+                t => {
+                    return Err(syn::Error::new_spanned(
+                        t,
+                        "expected parenthesied attribute arguments",
+                    ))
+                }
             };
 
-            self.parse_args(inner);
+            self.parse_args(span, inner)?;
         }
+        Ok(())
     }
 
-    pub fn parse_args(&mut self, tokens: TokenStream) {
+    pub fn parse_args(&mut self, mut span: Span, tokens: TokenStream) -> syn::Result<()> {
         let mut stream = TokenStream::new();
         for tt in tokens {
             match tt {
@@ -139,7 +171,8 @@ impl FieldAttr {
                     if p.as_char() == ',' {
                         let mut tmp = TokenStream::new();
                         std::mem::swap(&mut stream, &mut tmp);
-                        self.parse_arg(tmp)
+                        self.parse_arg(span, tmp)?;
+                        span = p.span();
                     } else {
                         stream.extend(vec![TokenTree::Punct(p)])
                     }
@@ -147,21 +180,24 @@ impl FieldAttr {
                 _ => stream.extend(vec![tt]),
             }
         }
-        self.parse_arg(stream)
+        self.parse_arg(span, stream)
     }
 
-    pub fn parse_arg(&mut self, tokens: TokenStream) {
+    pub fn parse_arg(&mut self, span: Span, tokens: TokenStream) -> syn::Result<()> {
         let mut tokens = tokens.into_iter();
         let ident = match tokens.next() {
             Some(TokenTree::Ident(i)) => i,
-            _ => panic!("expected ident"),
+            Some(t) => return Err(syn::Error::new_spanned(t, "expected ident")),
+            None => return Err(syn::Error::new(span, "expected ident to follow")),
         };
 
         match ident.to_string().as_ref() {
-            "prefix" => self.prefix = Some(parse_type(tokens)),
-            "suffix" => self.suffix = Some(parse_type(tokens)),
-            "parser" => self.parser = Some(parse_type(tokens)),
-            s => panic!("unknown parameter {}", s),
+            "prefix" => self.prefix = Some(parse_type(ident.span(), tokens)?),
+            "suffix" => self.suffix = Some(parse_type(ident.span(), tokens)?),
+            "parser" => self.parser = Some(parse_type(ident.span(), tokens)?),
+            "inner_parser" => self.vec.parser = Some(parse_type(ident.span(), tokens)?),
+            _ => return Err(syn::Error::new_spanned(ident, "unknown parameter")),
         }
+        Ok(())
     }
 }

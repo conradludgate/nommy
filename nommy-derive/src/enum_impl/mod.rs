@@ -2,13 +2,19 @@ mod named;
 mod unit;
 mod unnamed;
 
+use std::convert::TryInto;
+
 use named::EnumVariantNamed;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use unit::EnumVariantUnit;
 use unnamed::EnumVariantUnnamed;
 
-use crate::{attr::GlobalAttr, fn_impl::{parse_or, BuildOutput, FnImpl}, parsers::{FunctionBuilder, Parser, Peeker}};
+use crate::{
+    attr::GlobalAttr,
+    fn_impl::{parse_or, BuildOutput, FnImpl},
+    parsers::{FunctionBuilder, Parser, Peeker},
+};
 
 pub struct Enum {
     pub attrs: GlobalAttr,
@@ -70,8 +76,7 @@ impl ToTokens for Enum {
         let parse_prefix = parse_builder.fix(&attrs.prefix, "prefix", name.to_string());
         let parse_suffix = parse_builder.fix(&attrs.suffix, "suffix", name.to_string());
 
-        let mut peek_builder =
-            FunctionBuilder::<Peeker>::new(&mut peek_wc, generic, &attrs.ignore);
+        let mut peek_builder = FunctionBuilder::<Peeker>::new(&mut peek_wc, generic, &attrs.ignore);
         let peek_prefix = peek_builder.fix(&attrs.prefix, "prefix", name.to_string());
         let peek_suffix = peek_builder.fix(&attrs.suffix, "suffix", name.to_string());
 
@@ -149,40 +154,48 @@ impl Enum {
         generics: syn::Generics,
         attrs: Vec<syn::Attribute>,
         enum_data: syn::DataEnum,
-    ) -> Self {
+    ) -> syn::Result<Self> {
         let args = generics.type_params().cloned().map(|tp| tp.ident).collect();
 
         let variants = enum_data
             .variants
             .into_iter()
             .map(|v| match v.fields {
-                syn::Fields::Named(named) => EnumVariant::Named(EnumVariantNamed {
+                syn::Fields::Named(named) => Ok(EnumVariant::Named(EnumVariantNamed {
                     name: v.ident,
-                    attrs: GlobalAttr::parse_attrs(v.attrs),
-                    fields: named.named.into_iter().map(|f| f.into()).collect(),
-                }),
-                syn::Fields::Unnamed(unnamed) => EnumVariant::Unnamed(EnumVariantUnnamed {
+                    attrs: GlobalAttr::parse_attrs(v.attrs)?,
+                    fields: named
+                        .named
+                        .into_iter()
+                        .map(|f| f.try_into())
+                        .collect::<syn::Result<_>>()?,
+                })),
+                syn::Fields::Unnamed(unnamed) => Ok(EnumVariant::Unnamed(EnumVariantUnnamed {
                     name: v.ident,
-                    attrs: GlobalAttr::parse_attrs(v.attrs),
-                    fields: unnamed.unnamed.into_iter().map(|f| f.into()).collect(),
-                }),
-                syn::Fields::Unit => EnumVariant::Unit(EnumVariantUnit {
+                    attrs: GlobalAttr::parse_attrs(v.attrs)?,
+                    fields: unnamed
+                        .unnamed
+                        .into_iter()
+                        .map(|f| f.try_into())
+                        .collect::<syn::Result<_>>()?,
+                })),
+                syn::Fields::Unit => Ok(EnumVariant::Unit(EnumVariantUnit {
                     name: v.ident,
-                    attrs: GlobalAttr::parse_attrs(v.attrs),
-                }),
+                    attrs: GlobalAttr::parse_attrs(v.attrs)?,
+                })),
             })
-            .collect();
+            .collect::<syn::Result<_>>()?;
 
-        let attrs = GlobalAttr::parse_attrs(attrs);
+        let attrs = GlobalAttr::parse_attrs(attrs)?;
         let generic = parse_or(&attrs.parse_type);
 
-        Enum {
+        Ok(Enum {
             name,
             attrs,
             args,
             variants,
             generic,
-        }
+        })
     }
 }
 

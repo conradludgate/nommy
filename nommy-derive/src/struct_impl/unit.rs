@@ -37,17 +37,21 @@ impl FnImpl<NamedField> for Unit {
 }
 
 impl Unit {
-    pub fn new(name: syn::Ident, generics: syn::Generics, attrs: Vec<syn::Attribute>) -> Self {
+    pub fn new(
+        name: syn::Ident,
+        generics: syn::Generics,
+        attrs: Vec<syn::Attribute>,
+    ) -> syn::Result<Self> {
         let args = generics.type_params().cloned().map(|tp| tp.ident).collect();
-        let attrs = GlobalAttr::parse_attrs(attrs);
+        let attrs = GlobalAttr::parse_attrs(attrs)?;
         let generic = parse_or(&attrs.parse_type);
 
-        Unit {
+        Ok(Unit {
             attrs,
             name,
             args,
             generic,
-        }
+        })
     }
 }
 

@@ -13,13 +13,6 @@ use crate::*;
 /// ```
 pub struct Tag<const TAG: &'static str>;
 
-impl<const TAG: &'static str> Process for Tag<TAG> {
-    type Output = Self;
-    fn process(self) -> Self::Output {
-        self
-    }
-}
-
 impl<const TAG: &'static str> Peek<char> for Tag<TAG> {
     fn peek(input: &mut impl Buffer<char>) -> bool {
         TAG.chars().eq(input.take(TAG.len()))

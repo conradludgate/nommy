@@ -25,7 +25,11 @@ fn build<T: FieldType, F: FnImpl<T>, P: PTokens>(fn_impl: &F) -> BuildOutput {
 
     let fields = fn_impl.fields();
     for (i, field) in fields.iter().enumerate() {
-        tokens.extend(builder.field(field, i))
+        if field.attrs().vec.is_some() {
+            tokens.extend(builder.vec_field(field, i))
+        } else {
+            tokens.extend(builder.field(field, i))
+        }
     }
 
     tokens.extend(builder.fix(&attrs.suffix, "suffix", format!("{} `{}`", F::TYPE, name)));

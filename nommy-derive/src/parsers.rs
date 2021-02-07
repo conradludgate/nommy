@@ -1,9 +1,9 @@
-use std::marker::PhantomData;
+use std::{convert::TryFrom, marker::PhantomData};
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-use crate::attr::{FieldAttr};
+use crate::attr::FieldAttr;
 
 #[derive(Debug, Clone)]
 pub struct NamedField {
@@ -12,30 +12,27 @@ pub struct NamedField {
     pub ty: syn::Type,
 }
 
-impl From<syn::Field> for NamedField {
-    fn from(field: syn::Field) -> Self {
+impl TryFrom<syn::Field> for NamedField {
+    type Error = syn::Error;
+    fn try_from(field: syn::Field) -> syn::Result<Self> {
         let syn::Field {
             ident, attrs, ty, ..
         } = field;
-        let attrs = FieldAttr::parse_attrs(attrs);
-        NamedField {
+        let attrs = FieldAttr::parse_attrs(attrs)?;
+        Ok(NamedField {
             attrs,
             name: ident.unwrap(),
             ty,
-        }
+        })
     }
 }
 
-impl From<syn::Field> for UnnamedField {
-    fn from(field: syn::Field) -> Self {
-        let syn::Field {
-            attrs, ty, ..
-        } = field;
-        let attrs = FieldAttr::parse_attrs(attrs);
-        UnnamedField {
-            attrs,
-            ty,
-        }
+impl TryFrom<syn::Field> for UnnamedField {
+    type Error = syn::Error;
+    fn try_from(field: syn::Field) -> syn::Result<Self> {
+        let syn::Field { attrs, ty, .. } = field;
+        let attrs = FieldAttr::parse_attrs(attrs)?;
+        Ok(UnnamedField { attrs, ty })
     }
 }
 
@@ -76,46 +73,50 @@ impl FieldType for UnnamedField {
 }
 
 pub trait PTokens {
-    const ASSIGN: bool;
-    fn tokens(
+    fn tokens(ty: &syn::Type, generic: &syn::Type, error: impl AsRef<str>) -> TokenStream;
+    fn tokens_field(
+        name: &syn::Ident,
         ty: &syn::Type,
         generic: &syn::Type,
         error: impl AsRef<str>,
-        process: bool,
     ) -> TokenStream;
 }
 
 pub struct Parser;
 impl PTokens for Parser {
-    const ASSIGN: bool = true;
-    fn tokens(
+    fn tokens(ty: &syn::Type, generic: &syn::Type, error: impl AsRef<str>) -> TokenStream {
+        let error = error.as_ref();
+        quote! {
+            <#ty as ::nommy::Parse<#generic>>::parse(input).wrap_err(#error)?;
+        }
+    }
+    fn tokens_field(
+        name: &syn::Ident,
         ty: &syn::Type,
         generic: &syn::Type,
         error: impl AsRef<str>,
-        process: bool,
     ) -> TokenStream {
         let error = error.as_ref();
-        if process {
-            quote! {
-                <#ty as ::nommy::Process>::process(
-                    <#ty as ::nommy::Parse<#generic>>::parse(input).wrap_err(#error)?
-                );
-            }
-        } else {
-            quote! {
-                <#ty as ::nommy::Parse<#generic>>::parse(input).wrap_err(#error)?;
-            }
+        quote! {
+            let #name = <#ty as ::nommy::Parse<#generic>>::parse(input).wrap_err(#error)?.into();
         }
     }
 }
 
 pub struct Peeker;
 impl PTokens for Peeker {
-    const ASSIGN: bool = false;
-    fn tokens(ty: &syn::Type, generic: &syn::Type, _: impl AsRef<str>, _: bool) -> TokenStream {
+    fn tokens(ty: &syn::Type, generic: &syn::Type, _: impl AsRef<str>) -> TokenStream {
         quote! {
             if !(<#ty as ::nommy::Peek<#generic>>::peek(input)) { return false }
         }
+    }
+    fn tokens_field(
+        _: &syn::Ident,
+        ty: &syn::Type,
+        generic: &syn::Type,
+        error: impl AsRef<str>,
+    ) -> TokenStream {
+        Self::tokens(ty, generic, error)
     }
 }
 
@@ -139,7 +140,6 @@ impl<'a, P: PTokens> FunctionBuilder<'a, P> {
                 &ty,
                 &generic,
                 "parsing whitespace should not fail, but did",
-                false,
             ))
         }
 
@@ -165,7 +165,6 @@ impl<'a, P: PTokens> FunctionBuilder<'a, P> {
                     &prefix,
                     &self.generic,
                     format!("failed to parse {} for {}", fix_type, type_name.as_ref()),
-                    false,
                 );
                 tokens.extend(self.after_each.clone());
                 tokens
@@ -184,20 +183,47 @@ impl<'a, P: PTokens> FunctionBuilder<'a, P> {
 
         tokens.extend(self.fix(&attrs.prefix, "prefix", format!("field `{}`", name)));
 
-        if P::ASSIGN {
-            tokens.extend(quote! { let #name = });
-        }
-        let (parser, process) = match &attrs.parser {
-            Some(p) => (p, true),
-            None => (ty, false),
+        let parser = match &attrs.parser {
+            Some(p) => p,
+            None => ty,
         };
         self.wc.push(parser.clone());
-        tokens.extend(P::tokens(
+        tokens.extend(P::tokens_field(
+            &name,
             &parser,
             &self.generic,
             format!("failed to parse field `{}`", name),
-            process,
         ));
+
+        tokens.extend(self.after_each.clone());
+
+        tokens.extend(self.fix(&attrs.suffix, "suffix", format!("field `{}`", name)));
+
+        tokens
+    }
+
+    // prefix or suffix
+    pub fn vec_field<F: FieldType>(&mut self, field: &F, field_num: usize) -> TokenStream {
+        let ty = field.ty();
+        let name = field.name(field_num);
+        let attrs = field.attrs();
+
+        let mut tokens = TokenStream::new();
+
+        tokens.extend(self.fix(&attrs.prefix, "prefix", format!("field `{}`", name)));
+
+        let parser = match &attrs.parser {
+            Some(p) => p,
+            None => ty,
+        };
+        self.wc.push(parser.clone());
+        tokens.extend(P::tokens_field(
+            &name,
+            &parser,
+            &self.generic,
+            format!("failed to parse field `{}`", name),
+        ));
+
         tokens.extend(self.after_each.clone());
 
         tokens.extend(self.fix(&attrs.suffix, "suffix", format!("field `{}`", name)));

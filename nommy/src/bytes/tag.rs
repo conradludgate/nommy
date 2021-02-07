@@ -23,13 +23,6 @@ impl<const TAG: &'static [u8]> fmt::Display for TagParseError<TAG> {
 /// ```
 pub struct Tag<const TAG: &'static [u8]>;
 
-impl<const TAG: &'static [u8]> Process for Tag<TAG> {
-    type Output = Self;
-    fn process(self) -> Self::Output {
-        self
-    }
-}
-
 impl<const TAG: &'static [u8]> Peek<u8> for Tag<TAG> {
     fn peek(input: &mut impl Buffer<u8>) -> bool {
         TAG.iter().cloned().eq(input.take(TAG.len()))

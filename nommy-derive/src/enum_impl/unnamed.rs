@@ -24,7 +24,7 @@ impl FnImpl<UnnamedField> for (&EnumVariantUnnamed, &Enum) {
         let variant_name = &self.0.name;
         quote! {
             Ok(#enum_name::#variant_name (#(
-                #names.into(),
+                #names,
             )*))
         }
     }

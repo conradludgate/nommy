@@ -19,16 +19,15 @@ impl<const BYTES: &'static [u8]> fmt::Display for OneOfError<BYTES> {
 /// OneOf is a generic type that implements Parse to match one character within the given string
 ///
 /// ```
-/// use nommy::{Parse, Process, IntoBuf, bytes::OneOf};
+/// use nommy::{Parse, IntoBuf, bytes::OneOf};
 /// let mut buffer = "-".bytes().into_buf();
-/// let c = OneOf::<b"-_">::parse(&mut buffer).unwrap();
-/// assert_eq!(c.process(), b'-');
+/// let c: u8 = OneOf::<b"-_">::parse(&mut buffer).unwrap().into();
+/// assert_eq!(c, b'-');
 /// ```
 pub struct OneOf<const BYTES: &'static [u8]>(u8);
 
-impl<const BYTES: &'static [u8]> Process for OneOf<BYTES> {
-    type Output = u8;
-    fn process(self) -> Self::Output {
+impl<const BYTES: &'static [u8]> Into<u8> for OneOf<BYTES> {
+    fn into(self) -> u8 {
         self.0
     }
 }
@@ -80,16 +79,15 @@ impl<const BYTE_RANGE: RangeInclusive<u8>> fmt::Display for OneInRangeError<BYTE
 /// OneInRange is a generic type that implements Parse to match one character within the given range
 ///
 /// ```
-/// use nommy::{Parse, Process, IntoBuf, bytes::OneInRange};
+/// use nommy::{Parse, IntoBuf, bytes::OneInRange};
 /// let mut buffer = (5..).into_buf();
-/// let c = OneInRange::<{0..=10}>::parse(&mut buffer).unwrap();
-/// assert_eq!(c.process(), 5);
+/// let c: u8 = OneInRange::<{0..=10}>::parse(&mut buffer).unwrap().into();
+/// assert_eq!(c, 5);
 /// ```
 pub struct OneInRange<const BYTE_RANGE: RangeInclusive<u8>>(u8);
 
-impl<const BYTE_RANGE: RangeInclusive<u8>> Process for OneInRange<BYTE_RANGE> {
-    type Output = u8;
-    fn process(self) -> Self::Output {
+impl<const BYTE_RANGE: RangeInclusive<u8>> Into<u8> for OneInRange<BYTE_RANGE> {
+    fn into(self) -> u8 {
         self.0
     }
 }

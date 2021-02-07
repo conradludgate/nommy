@@ -29,20 +29,14 @@ impl<P: Peek<T>, T: Clone> Peek<T> for Option<P> {
 /// Result is None if parsing P fails, otherwise, result is Some(p)
 impl<P: Parse<T>, T: Clone> Parse<T> for Option<P> {
     fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self> {
-        if P::peek(&mut input.cursor()) {
-            Ok(Some(
-                P::parse(input).expect("peek succeeded but parse failed"),
-            ))
-        } else {
-            Ok(None)
+        let mut cursor = input.cursor();
+        match P::parse(&mut cursor) {
+            Ok(p) => {
+                cursor.fast_forward_parent();
+                Ok(Some(p))
+            },
+            _ => Ok(None),
         }
-    }
-}
-
-impl<P: Process> Process for Option<P> {
-    type Output = Option<P::Output>;
-    fn process(self) -> Self::Output {
-        self.map(P::process)
     }
 }
 
@@ -63,18 +57,16 @@ impl<P: Peek<T>, T: Clone> Peek<T> for Vec<P> {
 impl<P: Parse<T>, T: Clone> Parse<T> for Vec<P> {
     fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self> {
         let mut output = vec![];
-        while P::peek(&mut input.cursor()) {
-            output.push(P::parse(input).expect("peek succeeded but parse failed"));
+        loop {
+            let mut cursor = input.cursor();
+            match P::parse(&mut cursor) {
+                Ok(p) => output.push(p),
+                _ => break,
+            }
+            cursor.fast_forward_parent();
         }
 
         Ok(output)
-    }
-}
-
-impl<P: Process> Process for Vec<P> {
-    type Output = Vec<P::Output>;
-    fn process(self) -> Self::Output {
-        self.into_iter().map(P::process).collect()
     }
 }
 
@@ -123,18 +115,22 @@ impl<P: Peek<T>, T: Clone> Peek<T> for Vec1<P> {
 impl<P: Parse<T>, T: Clone> Parse<T> for Vec1<P> {
     fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self> {
         let mut output = vec![P::parse(input)?];
-        while P::peek(&mut input.cursor()) {
-            output.push(P::parse(input).expect("peek succeeded but parse failed"));
+        loop {
+            let mut cursor = input.cursor();
+            match P::parse(&mut cursor) {
+                Ok(p) => output.push(p),
+                _ => break,
+            }
+            cursor.fast_forward_parent();
         }
 
         Ok(Vec1(output))
     }
 }
 
-impl<P: Process> Process for Vec1<P> {
-    type Output = Vec<P::Output>;
-    fn process(self) -> Self::Output {
-        self.0.into_iter().map(P::process).collect()
+impl<P, T> Into<Vec<T>> for Vec1<P> where Vec<T>: From<Vec<P>> {
+    fn into(self) -> Vec<T> {
+        self.0.into()
     }
 }
 
@@ -170,13 +166,6 @@ impl<P: Parse<T>, T, const N: usize> Parse<T> for [P; N] {
 
             Ok(MaybeUninit::array_assume_init(output))
         }
-    }
-}
-
-impl<P: Process, const N: usize> Process for [P; N] {
-    type Output = [P::Output; N];
-    fn process(self) -> Self::Output {
-        self.map(P::process)
     }
 }
 

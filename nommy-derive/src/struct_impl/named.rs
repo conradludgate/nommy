@@ -1,8 +1,10 @@
+use std::convert::TryInto;
+
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 
 use crate::{
-    attr::{GlobalAttr},
+    attr::GlobalAttr,
     fn_impl::{parse_or, BuildOutput, FnImpl},
     parsers::NamedField,
 };
@@ -34,7 +36,7 @@ impl FnImpl<NamedField> for Named {
         let name = &self.name;
         quote! {
             Ok(#name {#(
-                #names: #names.into(),
+                #names: #names,
             )*})
         }
     }
@@ -46,19 +48,23 @@ impl Named {
         generics: syn::Generics,
         attrs: Vec<syn::Attribute>,
         fields: syn::FieldsNamed,
-    ) -> Self {
+    ) -> syn::Result<Self> {
         let args = generics.type_params().cloned().map(|tp| tp.ident).collect();
-        let fields = fields.named.into_iter().map(|f| f.into()).collect();
-        let attrs = GlobalAttr::parse_attrs(attrs);
+        let fields = fields
+            .named
+            .into_iter()
+            .map(|f| f.try_into())
+            .collect::<syn::Result<_>>()?;
+        let attrs = GlobalAttr::parse_attrs(attrs)?;
         let generic = parse_or(&attrs.parse_type);
 
-        Named {
+        Ok(Named {
             attrs,
             name,
             args,
             fields,
             generic,
-        }
+        })
     }
 }
 

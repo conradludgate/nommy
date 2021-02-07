@@ -5,16 +5,15 @@ use std::{fmt, ops::RangeInclusive};
 /// OneOf is a generic type that implements Parse to match one character within the given string
 ///
 /// ```
-/// use nommy::{Parse, Process, IntoBuf, text::OneOf};
+/// use nommy::{Parse, IntoBuf, text::OneOf};
 /// let mut buffer = "-".chars().into_buf();
 /// let c = OneOf::<"-_">::parse(&mut buffer).unwrap();
-/// assert_eq!(c.process(), '-');
+/// assert_eq!(c.into(), '-');
 /// ```
 pub struct OneOf<const CHARS: &'static str>(char);
 
-impl<const CHARS: &'static str> Process for OneOf<CHARS> {
-    type Output = char;
-    fn process(self) -> Self::Output {
+impl<const CHARS: &'static str> Into<char> for OneOf<CHARS> {
+    fn into(self) -> char {
         self.0
     }
 }
@@ -69,16 +68,15 @@ impl<const CHAR_RANGE: RangeInclusive<char>> fmt::Display for OneInRangeError<CH
 /// OneInRange is a generic type that implements Parse to match one character within the given range
 ///
 /// ```
-/// use nommy::{Parse, Process, IntoBuf, text::OneInRange};
+/// use nommy::{Parse, IntoBuf, text::OneInRange};
 /// let mut buffer = "12".chars().into_buf();
 /// let c = OneInRange::<{'0'..='9'}>::parse(&mut buffer).unwrap();
-/// assert_eq!(c.process(), '1');
+/// assert_eq!(c.into(), '1');
 /// ```
 pub struct OneInRange<const CHAR_RANGE: RangeInclusive<char>>(char);
 
-impl<const CHAR_RANGE: RangeInclusive<char>> Process for OneInRange<CHAR_RANGE> {
-    type Output = char;
-    fn process(self) -> Self::Output {
+impl<const CHAR_RANGE: RangeInclusive<char>> Into<char> for OneInRange<CHAR_RANGE> {
+    fn into(self) -> char {
         self.0
     }
 }
@@ -110,29 +108,29 @@ impl<const CHAR_RANGE: RangeInclusive<char>> Parse<char> for OneInRange<CHAR_RAN
 /// OneLowercase parses one character that matches any lower ascii letters
 ///
 /// ```
-/// use nommy::{Parse, Process, IntoBuf, text::OneLowercase};
+/// use nommy::{Parse, IntoBuf, text::OneLowercase};
 /// let mut buffer = "helloWorld".chars().into_buf();
 /// let c = OneLowercase::parse(&mut buffer).unwrap();
-/// assert_eq!(c.process(), 'h');
+/// assert_eq!(c.into(), 'h');
 /// ```
 pub type OneLowercase = OneInRange<{ 'a'..='z' }>;
 
 /// OneUppercase parses one character that matches any upper ascii letters
 ///
 /// ```
-/// use nommy::{Parse, Process, IntoBuf, text::OneUppercase};
+/// use nommy::{Parse, IntoBuf, text::OneUppercase};
 /// let mut buffer = "HELLOworld".chars().into_buf();
 /// let c = OneUppercase::parse(&mut buffer).unwrap();
-/// assert_eq!(c.process(), 'H');
+/// assert_eq!(c.into(), 'H');
 /// ```
 pub type OneUppercase = OneInRange<{ 'A'..='Z' }>;
 
 /// OneDigits parses one character that matches any ascii digits
 ///
 /// ```
-/// use nommy::{Parse, Process, IntoBuf, text::OneDigits};
+/// use nommy::{Parse, IntoBuf, text::OneDigits};
 /// let mut buffer = "1024$".chars().into_buf();
 /// let c = OneDigits::parse(&mut buffer).unwrap();
-/// assert_eq!(c.process(), '1');
+/// assert_eq!(c.into(), '1');
 /// ```
 pub type OneDigits = OneInRange<{ '0'..='9' }>;

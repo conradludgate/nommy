@@ -13,13 +13,6 @@ use crate::*;
 /// Parses newline `"\n"` or carriage return `"\r\n"`
 pub struct LineEnding;
 
-impl Process for LineEnding {
-    type Output = Self;
-    fn process(self) -> Self::Output {
-        self
-    }
-}
-
 impl Peek<char> for LineEnding {
     fn peek(input: &mut impl Buffer<char>) -> bool {
         match input.next() {
@@ -49,13 +42,6 @@ impl Parse<char> for LineEnding {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Space;
 
-impl Process for Space {
-    type Output = Self;
-    fn process(self) -> Self::Output {
-        self
-    }
-}
-
 impl Peek<char> for Space {
     fn peek(input: &mut impl Buffer<char>) -> bool {
         matches!(input.next(), Some(' ') | Some('\t'))
@@ -74,13 +60,6 @@ impl Parse<char> for Space {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct WhiteSpace;
-
-impl Process for WhiteSpace {
-    type Output = Self;
-    fn process(self) -> Self::Output {
-        self
-    }
-}
 
 impl Peek<char> for WhiteSpace {
     fn peek(input: &mut impl Buffer<char>) -> bool {

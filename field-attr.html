@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>nommy - Type Based parsing with Nommy</title>
+        <title>Field Attributes - Type Based parsing with Nommy</title>
         
         
 
@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="nommy.html"><strong aria-hidden="true">1.</strong> nommy</a></li><li class="chapter-item expanded "><a href="ideology.html"><strong aria-hidden="true">2.</strong> Ideology</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="buffers.html"><strong aria-hidden="true">2.1.</strong> Buffers</a></li><li class="chapter-item expanded "><a href="parsers.html"><strong aria-hidden="true">2.2.</strong> Parsers</a></li><li class="chapter-item expanded "><a href="peekers.html"><strong aria-hidden="true">2.3.</strong> Peekers</a></li></ol></li><li class="chapter-item expanded "><a href="basic.html"><strong aria-hidden="true">3.</strong> Basic Parsers</a></li><li class="chapter-item expanded "><a href="derive.html"><strong aria-hidden="true">4.</strong> Derive Parse</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="type-attr.html"><strong aria-hidden="true">4.1.</strong> Type Attributes</a></li><li class="chapter-item expanded "><a href="field-attr.html"><strong aria-hidden="true">4.2.</strong> Field Attributes</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="nommy.html"><strong aria-hidden="true">1.</strong> nommy</a></li><li class="chapter-item expanded "><a href="ideology.html"><strong aria-hidden="true">2.</strong> Ideology</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="buffers.html"><strong aria-hidden="true">2.1.</strong> Buffers</a></li><li class="chapter-item expanded "><a href="parsers.html"><strong aria-hidden="true">2.2.</strong> Parsers</a></li><li class="chapter-item expanded "><a href="peekers.html"><strong aria-hidden="true">2.3.</strong> Peekers</a></li></ol></li><li class="chapter-item expanded "><a href="basic.html"><strong aria-hidden="true">3.</strong> Basic Parsers</a></li><li class="chapter-item expanded "><a href="derive.html"><strong aria-hidden="true">4.</strong> Derive Parse</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="type-attr.html"><strong aria-hidden="true">4.1.</strong> Type Attributes</a></li><li class="chapter-item expanded "><a href="field-attr.html" class="active"><strong aria-hidden="true">4.2.</strong> Field Attributes</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -163,70 +163,92 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#nommy" id="nommy">nommy</a></h1>
-<p><strong>nommy</strong> is a type based parsing crate that features a derive macro to help you utilise the power of rust and nommy</p>
-<pre><pre class="playground"><code class="language-rust edition2018">use nommy::{parse, text::*, Parse};
+                        <h1><a class="header" href="#field-attributes" id="field-attributes">Field Attributes</a></h1>
+<p>There's currently only 4 supported field attributes</p>
+<h2><a class="header" href="#parser" id="parser">Parser</a></h2>
+<p><code>parser</code> lets you specify how to parse the input into the type specified.</p>
+<p>For example, parsing letters into a string:</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">use nommy::{Parse, IntoBuf, text::AnyOf1};
+</span>
+type Letters = AnyOf1&lt;&quot;abcdefghijklmnopqrstuvwxyz&quot;&gt;;
 
-type Letters = AnyOf1&lt;&quot;abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ&quot;&gt;;
-
-#[derive(Debug, Parse, PartialEq)]
-#[nommy(prefix = Tag&lt;&quot;struct&quot;&gt;)]
-#[nommy(ignore = WhiteSpace)]
-struct StructNamed {
+<span class="boring">#[derive(Debug, PartialEq)]
+</span>#[derive(Parse)]
+pub struct Word (
     #[nommy(parser = Letters)]
-    name: String,
+    String,
+);
 
-    #[nommy(prefix = Tag&lt;&quot;{&quot;&gt;, suffix = Tag&lt;&quot;}&quot;&gt;)]
-    fields: Vec&lt;NamedField&gt;,
-}
+let mut buffer = &quot;foo bar&quot;.chars().into_buf();
+assert_eq!(Word::parse(&amp;mut buffer).unwrap(), Word(&quot;foo&quot;.to_string()));
+<span class="boring">}
+</span></code></pre></pre>
+<p>This works because <code>Letters</code> implements <code>Into&lt;String&gt;</code>.</p>
+<h2><a class="header" href="#prefixsuffix" id="prefixsuffix">Prefix/Suffix</a></h2>
+<p><code>prefix</code> and <code>suffix</code> define the parser that you expect to match before we attempt to parse the value we care about.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">use nommy::{Parse, IntoBuf, text::{Tag, AnyOf1, Space}};
+</span>
+type Numbers = AnyOf1&lt;&quot;0123456789&quot;&gt;;
 
-#[derive(Debug, Parse, PartialEq)]
-#[nommy(suffix = Tag&lt;&quot;,&quot;&gt;)]
-#[nommy(ignore = WhiteSpace)]
-struct NamedField {
-    #[nommy(parser = Letters)]
-    name: String,
+<span class="boring">#[derive(Debug, PartialEq)]
+</span>#[derive(Parse)]
+#[nommy(ignore = Space)]
+pub struct Add(
+    #[nommy(parser = Numbers)]
+    String,
 
-    #[nommy(prefix = Tag&lt;&quot;:&quot;&gt;, parser = Letters)]
-    ty: String,
-}
+    #[nommy(prefix = Tag&lt;&quot;+&quot;&gt;)]
+    #[nommy(parser = Numbers)]
+    String,
+);
 
-fn main() {
-    let input = &quot;struct Foo {
-        bar: Abc,
-        baz: Xyz,
-    }&quot;;
+let mut buffer = &quot;4 + 7&quot;.chars().into_buf();
+assert_eq!(
+    Add::parse(&amp;mut buffer).unwrap(),
+    Add(&quot;4&quot;.to_string(), &quot;7&quot;.to_string()),
+);
+assert!(buffer.next().is_none());
+<span class="boring">}
+</span></code></pre></pre>
+<h2><a class="header" href="#inner-parser" id="inner-parser">Inner Parser</a></h2>
+<p><code>inner_parser</code> lets you specify how to parse the input into the vec type specified.</p>
+<p>For example, parsing letters into a string:</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">use nommy::{Parse, IntoBuf, text::OneOf};
+</span>
+type Letter = OneOf&lt;&quot;abcdefghijklmnopqrstuvwxyz&quot;&gt;;
 
-    let struct_: StructNamed = parse(input.chars()).unwrap();
-    assert_eq!(
-        struct_,
-        StructNamed {
-            name: &quot;Foo&quot;.to_string(),
-            fields: vec![
-                NamedField {
-                    name: &quot;bar&quot;.to_string(),
-                    ty: &quot;Abc&quot;.to_string(),
-                },
-                NamedField {
-                    name: &quot;baz&quot;.to_string(),
-                    ty: &quot;Xyz&quot;.to_string(),
-                },
-            ]
-        }
-    );
-}
-</code></pre></pre>
+<span class="boring">#[derive(Debug, PartialEq)]
+</span>#[derive(Parse)]
+pub struct Letters (
+    #[nommy(inner_parser = Letter)]
+    Vec&lt;char&gt;,
+);
+
+let mut buffer = &quot;foo bar&quot;.chars().into_buf();
+assert_eq!(Letters::parse(&amp;mut buffer).unwrap(), Letters(vec!['f', 'o', 'o']));
+<span class="boring">}
+</span></code></pre></pre>
+<p>This is necessary because <code>Vec&lt;P&gt;</code> <strong>does not</strong> implement <code>Into&lt;Vec&lt;Q&gt;&gt;</code> even if <code>P: Into&lt;Q&gt;</code>.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
-
-                        
-                            <a rel="next" href="ideology.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <i class="fa fa-angle-right"></i>
+                            <a rel="prev" href="type-attr.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
                             </a>
+                        
+
                         
 
                         <div style="clear: both"></div>
@@ -236,11 +258,11 @@ fn main() {
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
-
-                
-                    <a rel="next" href="ideology.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <i class="fa fa-angle-right"></i>
+                    <a rel="prev" href="type-attr.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
                     </a>
+                
+
                 
             </nav>
 

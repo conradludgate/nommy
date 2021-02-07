@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>nommy - Type Based parsing with Nommy</title>
+        <title>Basic Parsers - Type Based parsing with Nommy</title>
         
         
 
@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="nommy.html"><strong aria-hidden="true">1.</strong> nommy</a></li><li class="chapter-item expanded "><a href="ideology.html"><strong aria-hidden="true">2.</strong> Ideology</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="buffers.html"><strong aria-hidden="true">2.1.</strong> Buffers</a></li><li class="chapter-item expanded "><a href="parsers.html"><strong aria-hidden="true">2.2.</strong> Parsers</a></li><li class="chapter-item expanded "><a href="peekers.html"><strong aria-hidden="true">2.3.</strong> Peekers</a></li></ol></li><li class="chapter-item expanded "><a href="basic.html"><strong aria-hidden="true">3.</strong> Basic Parsers</a></li><li class="chapter-item expanded "><a href="derive.html"><strong aria-hidden="true">4.</strong> Derive Parse</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="type-attr.html"><strong aria-hidden="true">4.1.</strong> Type Attributes</a></li><li class="chapter-item expanded "><a href="field-attr.html"><strong aria-hidden="true">4.2.</strong> Field Attributes</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="nommy.html"><strong aria-hidden="true">1.</strong> nommy</a></li><li class="chapter-item expanded "><a href="ideology.html"><strong aria-hidden="true">2.</strong> Ideology</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="buffers.html"><strong aria-hidden="true">2.1.</strong> Buffers</a></li><li class="chapter-item expanded "><a href="parsers.html"><strong aria-hidden="true">2.2.</strong> Parsers</a></li><li class="chapter-item expanded "><a href="peekers.html"><strong aria-hidden="true">2.3.</strong> Peekers</a></li></ol></li><li class="chapter-item expanded "><a href="basic.html" class="active"><strong aria-hidden="true">3.</strong> Basic Parsers</a></li><li class="chapter-item expanded "><a href="derive.html"><strong aria-hidden="true">4.</strong> Derive Parse</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="type-attr.html"><strong aria-hidden="true">4.1.</strong> Type Attributes</a></li><li class="chapter-item expanded "><a href="field-attr.html"><strong aria-hidden="true">4.2.</strong> Field Attributes</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -163,68 +163,106 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#nommy" id="nommy">nommy</a></h1>
-<p><strong>nommy</strong> is a type based parsing crate that features a derive macro to help you utilise the power of rust and nommy</p>
-<pre><pre class="playground"><code class="language-rust edition2018">use nommy::{parse, text::*, Parse};
+                        <h1><a class="header" href="#basic-parsers" id="basic-parsers">Basic Parsers</a></h1>
+<p><code>nommy</code> provides a set of basic parsers to handle a lot of standard situations. A lot of these makes use of rust's new <a href="https://doc.rust-lang.org/nightly/unstable-book/language-features/const-generics.html"><code>const generics</code></a></p>
+<h2><a class="header" href="#tag" id="tag">Tag</a></h2>
+<p><a href="https://docs.rs/nommy/latest/nommy/text/struct.Tag.html"><code>Tag</code></a> matches an exact string or byte slice in the input buffer.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">use nommy::{IntoBuf, Parse, text::Tag};
+</span>let mut buffer = &quot;foobar&quot;.chars().into_buf();
+assert!(Tag::&lt;&quot;foo&quot;&gt;::peek(&amp;mut buffer));
+assert!(Tag::&lt;&quot;bar&quot;&gt;::peek(&amp;mut buffer));
+assert!(buffer.next().is_none());
+<span class="boring">}
+</span></code></pre></pre>
+<h2><a class="header" href="#oneof" id="oneof">OneOf</a></h2>
+<p><a href="https://docs.rs/nommy/latest/nommy/text/struct.OneOf.html"><code>OneOf</code></a> matches one character or byte that is contained within the pattern string.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">use nommy::{IntoBuf, Parse, text::OneOf};
+</span>let mut buffer = &quot;bC&quot;.chars().into_buf();
+assert_eq!(OneOf::&lt;&quot;abcd&quot;&gt;::parse(&amp;mut buffer).unwrap().into(), 'b');
+assert_eq!(OneOf::&lt;&quot;ABCD&quot;&gt;::parse(&amp;mut buffer).unwrap().into(), 'C');
+assert!(buffer.next().is_none());
+<span class="boring">}
+</span></code></pre></pre>
+<h2><a class="header" href="#anyof" id="anyof">AnyOf</a></h2>
+<p><a href="https://docs.rs/nommy/latest/nommy/text/struct.AnyOf.html"><code>AnyOf</code></a> matches as many characters or bytes that are contained within the pattern string as possible.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">use nommy::{IntoBuf, Parse, text::AnyOf};
+</span>let mut buffer = &quot;dbacCBAD&quot;.chars().into_buf();
+assert_eq!(&amp;AnyOf::&lt;&quot;abcd&quot;&gt;::parse(&amp;mut buffer).unwrap().into(), &quot;dbac&quot;);
+assert_eq!(&amp;AnyOf::&lt;&quot;ABCD&quot;&gt;::parse(&amp;mut buffer).unwrap().into(), &quot;CBAD&quot;);
+assert!(buffer.next().is_none());
+<span class="boring">}
+</span></code></pre></pre>
+<h2><a class="header" href="#anyof1" id="anyof1">AnyOf1</a></h2>
+<p><a href="https://docs.rs/nommy/latest/nommy/text/struct.AnyOf1.html"><code>AnyOf1</code></a> matches as many characters or bytes that are contained within the pattern string as possible,
+requiring at least 1 value to match.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">use nommy::{IntoBuf, Parse, text::AnyOf1};
+</span>let mut buffer = &quot;dbacCBAD&quot;.chars().into_buf();
+assert_eq!(&amp;AnyOf1::&lt;&quot;abcd&quot;&gt;::parse(&amp;mut buffer).unwrap().into(), &quot;dbac&quot;);
+assert_eq!(&amp;AnyOf1::&lt;&quot;ABCD&quot;&gt;::parse(&amp;mut buffer).unwrap().into(), &quot;CBAD&quot;);
+assert!(buffer.next().is_none());
+<span class="boring">}
+</span></code></pre></pre>
+<h2><a class="header" href="#whilenot1" id="whilenot1">WhileNot1</a></h2>
+<p><a href="https://docs.rs/nommy/latest/nommy/text/struct.WhileNot1.html"><code>WhileNot1</code></a> matches as many characters or bytes that are <strong>not</strong> contained within the pattern string as possible,
+requiring at least 1 value to match.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">use nommy::{IntoBuf, Parse, text::WhileNot1};
+</span>let mut buffer = &quot;hello world!&quot;.chars().into_buf();
+assert_eq!(&amp;WhileNot1::&lt;&quot;.?!&quot;&gt;::parse(&amp;mut buffer).unwrap().into(), &quot;hello world&quot;);
+assert_eq!(buffer.next(), Some('!'));
+<span class="boring">}
+</span></code></pre></pre>
+<h2><a class="header" href="#vec" id="vec">Vec</a></h2>
+<p><code>Vec</code> parses <code>P</code> as many times as it can.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">use nommy::{IntoBuf, Parse, text::Tag};
+</span>let mut buffer = &quot;...!&quot;.chars().into_buf();
+assert_eq!(Vec::&lt;Tag&lt;&quot;.&quot;&gt;&gt;::parse(&amp;mut buffer).unwrap().len(), 3);
+assert_eq!(buffer.next(), Some('!'));
+<span class="boring">}
+</span></code></pre></pre>
+<h2><a class="header" href="#vec1" id="vec1">Vec1</a></h2>
+<p><a href="https://docs.rs/nommy/latest/nommy/struct.Vec1.html"><code>Vec1</code></a> parses <code>P</code> as many times as it can, requiring at least 1 match.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">use nommy::{IntoBuf, Parse, Vec1, text::Tag};
+</span>let mut buffer = &quot;...!&quot;.chars().into_buf();
+assert_eq!(Vec1::&lt;Tag&lt;&quot;.&quot;&gt;&gt;::parse(&amp;mut buffer).unwrap().len(), 3);
 
-type Letters = AnyOf1&lt;&quot;abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ&quot;&gt;;
-
-#[derive(Debug, Parse, PartialEq)]
-#[nommy(prefix = Tag&lt;&quot;struct&quot;&gt;)]
-#[nommy(ignore = WhiteSpace)]
-struct StructNamed {
-    #[nommy(parser = Letters)]
-    name: String,
-
-    #[nommy(prefix = Tag&lt;&quot;{&quot;&gt;, suffix = Tag&lt;&quot;}&quot;&gt;)]
-    fields: Vec&lt;NamedField&gt;,
-}
-
-#[derive(Debug, Parse, PartialEq)]
-#[nommy(suffix = Tag&lt;&quot;,&quot;&gt;)]
-#[nommy(ignore = WhiteSpace)]
-struct NamedField {
-    #[nommy(parser = Letters)]
-    name: String,
-
-    #[nommy(prefix = Tag&lt;&quot;:&quot;&gt;, parser = Letters)]
-    ty: String,
-}
-
-fn main() {
-    let input = &quot;struct Foo {
-        bar: Abc,
-        baz: Xyz,
-    }&quot;;
-
-    let struct_: StructNamed = parse(input.chars()).unwrap();
-    assert_eq!(
-        struct_,
-        StructNamed {
-            name: &quot;Foo&quot;.to_string(),
-            fields: vec![
-                NamedField {
-                    name: &quot;bar&quot;.to_string(),
-                    ty: &quot;Abc&quot;.to_string(),
-                },
-                NamedField {
-                    name: &quot;baz&quot;.to_string(),
-                    ty: &quot;Xyz&quot;.to_string(),
-                },
-            ]
-        }
-    );
-}
-</code></pre></pre>
+// assert_eq!(buffer.next(), Some('!'));
+Vec1::&lt;Tag&lt;&quot;.&quot;&gt;&gt;::parse(&amp;mut buffer).unwrap_err()
+<span class="boring">}
+</span></code></pre></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
+                            <a rel="prev" href="peekers.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
 
                         
-                            <a rel="next" href="ideology.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="derive.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
                         
@@ -236,9 +274,13 @@ fn main() {
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
+                    <a rel="prev" href="peekers.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
 
                 
-                    <a rel="next" href="ideology.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next" href="derive.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
                 

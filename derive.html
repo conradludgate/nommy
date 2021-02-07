@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>nommy - Type Based parsing with Nommy</title>
+        <title>Derive Parse - Type Based parsing with Nommy</title>
         
         
 
@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="nommy.html"><strong aria-hidden="true">1.</strong> nommy</a></li><li class="chapter-item expanded "><a href="ideology.html"><strong aria-hidden="true">2.</strong> Ideology</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="buffers.html"><strong aria-hidden="true">2.1.</strong> Buffers</a></li><li class="chapter-item expanded "><a href="parsers.html"><strong aria-hidden="true">2.2.</strong> Parsers</a></li><li class="chapter-item expanded "><a href="peekers.html"><strong aria-hidden="true">2.3.</strong> Peekers</a></li></ol></li><li class="chapter-item expanded "><a href="basic.html"><strong aria-hidden="true">3.</strong> Basic Parsers</a></li><li class="chapter-item expanded "><a href="derive.html"><strong aria-hidden="true">4.</strong> Derive Parse</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="type-attr.html"><strong aria-hidden="true">4.1.</strong> Type Attributes</a></li><li class="chapter-item expanded "><a href="field-attr.html"><strong aria-hidden="true">4.2.</strong> Field Attributes</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="nommy.html"><strong aria-hidden="true">1.</strong> nommy</a></li><li class="chapter-item expanded "><a href="ideology.html"><strong aria-hidden="true">2.</strong> Ideology</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="buffers.html"><strong aria-hidden="true">2.1.</strong> Buffers</a></li><li class="chapter-item expanded "><a href="parsers.html"><strong aria-hidden="true">2.2.</strong> Parsers</a></li><li class="chapter-item expanded "><a href="peekers.html"><strong aria-hidden="true">2.3.</strong> Peekers</a></li></ol></li><li class="chapter-item expanded "><a href="basic.html"><strong aria-hidden="true">3.</strong> Basic Parsers</a></li><li class="chapter-item expanded "><a href="derive.html" class="active"><strong aria-hidden="true">4.</strong> Derive Parse</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="type-attr.html"><strong aria-hidden="true">4.1.</strong> Type Attributes</a></li><li class="chapter-item expanded "><a href="field-attr.html"><strong aria-hidden="true">4.2.</strong> Field Attributes</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -163,68 +163,105 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1><a class="header" href="#nommy" id="nommy">nommy</a></h1>
-<p><strong>nommy</strong> is a type based parsing crate that features a derive macro to help you utilise the power of rust and nommy</p>
-<pre><pre class="playground"><code class="language-rust edition2018">use nommy::{parse, text::*, Parse};
-
-type Letters = AnyOf1&lt;&quot;abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ&quot;&gt;;
-
-#[derive(Debug, Parse, PartialEq)]
-#[nommy(prefix = Tag&lt;&quot;struct&quot;&gt;)]
-#[nommy(ignore = WhiteSpace)]
-struct StructNamed {
-    #[nommy(parser = Letters)]
-    name: String,
-
-    #[nommy(prefix = Tag&lt;&quot;{&quot;&gt;, suffix = Tag&lt;&quot;}&quot;&gt;)]
-    fields: Vec&lt;NamedField&gt;,
+                        <h1><a class="header" href="#derive-parse" id="derive-parse">Derive Parse</a></h1>
+<p>If writing <a href="https://docs.rs/nommy/latest/nommy/trait.Parse.html"><code>Parse</code></a> <code>impl</code>s is getting a bit tiresome for some basic situations,
+you can make use of the derive macro provided to implement a lot of standard situations</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">use nommy::{IntoBuf, Parse, text::Tag};
+</span>#[derive(Parse)]
+pub struct FooBar {
+    foo: Tag&lt;&quot;foo&quot;&gt;,
+    bar: Tag&lt;&quot;bar&quot;&gt;,
 }
 
-#[derive(Debug, Parse, PartialEq)]
-#[nommy(suffix = Tag&lt;&quot;,&quot;&gt;)]
-#[nommy(ignore = WhiteSpace)]
-struct NamedField {
-    #[nommy(parser = Letters)]
-    name: String,
+let mut buffer = &quot;foobar&quot;.chars().into_buf();
+assert!(FooBar::peek(&amp;mut buffer));
+assert!(buffer.next().is_none());
+<span class="boring">}
+</span></code></pre></pre>
+<h2><a class="header" href="#options" id="options">Options</a></h2>
+<p>The following sections will cover the derive macro in more detail, but before then, let's cover the structure of how to configure the macro.</p>
+<p>The <a href="https://docs.rs/nommy/latest/nommy/derive.Parse.html"><code>derive(Parse)</code></a> macro makes use of the <code>nommy</code> attribute to configure how the <a href="https://docs.rs/nommy/latest/nommy/trait.Parse.html"><code>Parse</code></a> implementation is created. There are two different types of attribute. <code>type attributes</code> and <code>field attributes</code>.</p>
+<p>Refer to the examples below to understand the difference</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">use nommy::{Parse, text::Tag};
+</span>
+/// Named struct FooBar
+#[derive(Parse)]
+#[nommy(&quot;i am a type attribute&quot;)]
+#[nommy(&quot;i am another type attribute&quot;)]
+pub struct FooBar {
+    #[nommy(&quot;i am a field attribute&quot;)]
+    foo: Tag&lt;&quot;foo&quot;&gt;,
 
-    #[nommy(prefix = Tag&lt;&quot;:&quot;&gt;, parser = Letters)]
-    ty: String,
+    #[nommy(&quot;i am also a field attribute&quot;)]
+    #[nommy(&quot;i am another field attribute&quot;)]
+    bar: Tag&lt;&quot;bar&quot;&gt;,
 }
 
-fn main() {
-    let input = &quot;struct Foo {
-        bar: Abc,
-        baz: Xyz,
-    }&quot;;
+/// Tuple struct Baz123
+#[derive(Parse)]
+#[nommy(&quot;i am a type attribute&quot;)]
+#[nommy(&quot;i am another type attribute&quot;)]
+pub struct Baz123 (
+    #[nommy(&quot;i am a field attribute&quot;)]
+    Tag&lt;&quot;baz&quot;&gt;,
 
-    let struct_: StructNamed = parse(input.chars()).unwrap();
-    assert_eq!(
-        struct_,
-        StructNamed {
-            name: &quot;Foo&quot;.to_string(),
-            fields: vec![
-                NamedField {
-                    name: &quot;bar&quot;.to_string(),
-                    ty: &quot;Abc&quot;.to_string(),
-                },
-                NamedField {
-                    name: &quot;baz&quot;.to_string(),
-                    ty: &quot;Xyz&quot;.to_string(),
-                },
-            ]
-        }
-    );
-}
-</code></pre></pre>
+    #[nommy(&quot;i am also a field attribute&quot;)]
+    #[nommy(&quot;i am another field attribute&quot;)]
+    Tag&lt;&quot;123&quot;&gt;,
+);
+
+/// Enum struct FooBarBaz123
+#[derive(Parse)]
+#[nommy(&quot;i am a type attribute&quot;)]
+#[nommy(&quot;i am another type attribute&quot;)]
+pub struct FooBarBaz123 (
+    /// named variants are supported
+    #[nommy(&quot;for now, variants also are type attributes&quot;)]
+    FooBar{
+        #[nommy(&quot;i am a field attribute&quot;)]
+        foo: Tag&lt;&quot;foo&quot;&gt;,
+
+        #[nommy(&quot;i am also a field attribute&quot;)]
+        #[nommy(&quot;i am another field attribute&quot;)]
+        bar: Tag&lt;&quot;bar&quot;&gt;,
+    },
+
+    /// tuple variants are supported
+    #[nommy(&quot;for now, variants also are type attributes&quot;)]
+    Baz123(
+        #[nommy(&quot;i am a field attribute&quot;)]
+        Tag&lt;&quot;baz&quot;&gt;,
+
+        #[nommy(&quot;i am also a field attribute&quot;)]
+        #[nommy(&quot;i am another field attribute&quot;)]
+        Tag&lt;&quot;123&quot;&gt;,
+    ),
+
+    /// unit variants are also supported
+    #[nommy(&quot;for now, variants also are type attributes&quot;)]
+    None,
+);
+<span class="boring">}
+</span></code></pre></pre>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
+                            <a rel="prev" href="basic.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
 
                         
-                            <a rel="next" href="ideology.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="type-attr.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
                         
@@ -236,9 +273,13 @@ fn main() {
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
+                    <a rel="prev" href="basic.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
 
                 
-                    <a rel="next" href="ideology.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next" href="type-attr.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
                 

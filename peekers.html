@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="nommy.html"><strong aria-hidden="true">1.</strong> nommy</a></li><li class="chapter-item expanded "><a href="ideology.html"><strong aria-hidden="true">2.</strong> Ideology</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="buffers.html"><strong aria-hidden="true">2.1.</strong> Buffers</a></li><li class="chapter-item expanded "><a href="parsers.html"><strong aria-hidden="true">2.2.</strong> Parsers</a></li><li class="chapter-item expanded "><a href="peekers.html" class="active"><strong aria-hidden="true">2.3.</strong> Peekers</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="nommy.html"><strong aria-hidden="true">1.</strong> nommy</a></li><li class="chapter-item expanded "><a href="ideology.html"><strong aria-hidden="true">2.</strong> Ideology</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="buffers.html"><strong aria-hidden="true">2.1.</strong> Buffers</a></li><li class="chapter-item expanded "><a href="parsers.html"><strong aria-hidden="true">2.2.</strong> Parsers</a></li><li class="chapter-item expanded "><a href="peekers.html" class="active"><strong aria-hidden="true">2.3.</strong> Peekers</a></li></ol></li><li class="chapter-item expanded "><a href="basic.html"><strong aria-hidden="true">3.</strong> Basic Parsers</a></li><li class="chapter-item expanded "><a href="derive.html"><strong aria-hidden="true">4.</strong> Derive Parse</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="type-attr.html"><strong aria-hidden="true">4.1.</strong> Type Attributes</a></li><li class="chapter-item expanded "><a href="field-attr.html"><strong aria-hidden="true">4.2.</strong> Field Attributes</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -164,17 +164,22 @@
                 <div id="content" class="content">
                     <main>
                         <h1><a class="header" href="#peekers" id="peekers">Peekers</a></h1>
-<p><a href="https://docs.rs/nommy/latest/nommy/trait.Peek.html"><code>Peek</code></a> is a lot like <a href="https://docs.rs/nommy/latest/nommy/trait.Parse.html"><code>Parse</code></a>. It's definition is almost exactly the same, but instead of returning <code>Result&lt;Self&gt;</code>, it returns <code>bool</code>. It's supposed to be a faster method of determining whether a given input could be parsed. A lot of the built in parsers utilise <a href="https://docs.rs/nommy/latest/nommy/trait.Peek.html"><code>Peek</code></a> under the hood to resolve branches</p>
+<p>Hidden in the <a href="https://docs.rs/nommy/latest/nommy/trait.Parse.html"><code>Parse</code></a> definition in the previous chapter is the <code>peek</code> method. It's definition is almost exactly the same as <code>parse</code>, but instead of returning <code>Result&lt;Self&gt;</code>, it returns <code>bool</code>. It's supposed to be a faster method of determining whether a given input could be parsed. A lot of the built in parsers utilise [<code>peek</code>] under the hood to resolve branches.</p>
 <pre><pre class="playground"><code class="language-rust edition2018">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>pub trait Peek&lt;T&gt;: Sized {
-    fn peek(input: &amp;mut impl Buffer&lt;T&gt;) -&gt; bool;
+</span>pub trait Parse&lt;T&gt;: Sized {
+<span class="boring">    fn parse(input: &amp;mut impl Buffer&lt;T&gt;) -&gt; eyre::Result&lt;Self&gt;;
+</span><span class="boring">    
+</span>    fn peek(input: &amp;mut impl Buffer&lt;T&gt;) -&gt; bool {
+        // Default impl - override for better performance
+        Self::parse(input).is_ok()
+    }
 }
 <span class="boring">}
 </span></code></pre></pre>
 <h2><a class="header" href="#example" id="example">Example</a></h2>
-<p>This is the same example from the Parsers section, but instead implementing <a href="https://docs.rs/nommy/latest/nommy/trait.Peek.html"><code>Peek</code></a>.
+<p>This is the same example from the <a href="parsers.html"><code>Parsers</code></a> section, but instead implementing <code>peek</code>.
 It follows a very similar implementation, but avoids a lot of the heavy work, such as dealing with errors
 and saving the chars to the string buffer</p>
 <pre><pre class="playground"><code class="language-rust edition2018">
@@ -182,8 +187,12 @@ and saving the chars to the string buffer</p>
 </span><span class="boring">fn main() {
 </span>/// StringParser parses a code representation of a string
 struct StringParser(String);
-impl Peek&lt;char&gt; for StringParser {
-    fn peek(input: &amp;mut impl Buffer&lt;char&gt;) -&gt; bool {
+impl Parse&lt;char&gt; for StringParser {
+<span class="boring">    fn parse(input: &amp;mut impl Buffer&lt;char&gt;) -&gt; Result&lt;Self&gt; {
+</span><span class="boring">        unimplemented!()
+</span><span class="boring">    }
+</span><span class="boring">    
+</span>    fn peek(input: &amp;mut impl Buffer&lt;char&gt;) -&gt; bool {
         // ensure the first character is a quote mark
         if input.next() != Some('\&quot;') {
             return false;
@@ -223,6 +232,10 @@ impl Peek&lt;char&gt; for StringParser {
                         
 
                         
+                            <a rel="next" href="basic.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
 
                         <div style="clear: both"></div>
                     </nav>
@@ -236,6 +249,10 @@ impl Peek&lt;char&gt; for StringParser {
                     </a>
                 
 
+                
+                    <a rel="next" href="basic.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
                 
             </nav>
 

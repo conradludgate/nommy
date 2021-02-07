@@ -3,6 +3,8 @@
 #![feature(maybe_uninit_array_assume_init)]
 #![allow(incomplete_features)]
 #![feature(const_generics)]
+#![deny(missing_docs)]
+#![deny(missing_doc_code_examples)]
 
 //! Type based parsing library
 //!
@@ -171,6 +173,8 @@ where
 /// Tag::<".">::parse(&mut buffer).unwrap();
 /// ```
 pub trait Parse<T>: Sized + Peek<T> {
+    /// Parse the input buffer, returning Ok if the value could be parsed,
+    /// Otherwise, returns a meaningful error
     fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self>;
 }
 
@@ -186,6 +190,8 @@ pub trait Parse<T>: Sized + Peek<T> {
 /// assert!(Tag::<".">::peek(&mut buffer.cursor()));
 /// ```
 pub trait Peek<T>: Sized {
+    /// Peek reads the input buffer, returning true if the value could be found,
+    /// Otherwise, returns false
     fn peek(input: &mut impl Buffer<T>) -> bool;
 }
 

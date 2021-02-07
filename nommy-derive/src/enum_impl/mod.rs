@@ -20,10 +20,10 @@ pub struct Enum {
     generic: syn::Type,
 }
 
-fn map<T, U, F: FnMut(&T) -> U>(input: &Vec<T>, f: F) -> Vec<U> {
+fn map<T, U, F: FnMut(&T) -> U>(input: &[T], f: F) -> Vec<U> {
     input.iter().map(f).collect()
 }
-fn map_unzip<T, U1, U2, F: FnMut(&T) -> (U1, U2)>(input: &Vec<T>, f: F) -> (Vec<U1>, Vec<U2>) {
+fn map_unzip<T, U1, U2, F: FnMut(&T) -> (U1, U2)>(input: &[T], f: F) -> (Vec<U1>, Vec<U2>) {
     input.iter().map(f).unzip()
 }
 

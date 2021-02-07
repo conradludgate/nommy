@@ -262,7 +262,7 @@ fn peeker_peek_vec_tokens(ty: &syn::Type, generic: &syn::Type) -> TokenStream {
 
 pub fn ignore_impl(
     wc: &mut TokenStream,
-    ignore: &Vec<syn::Type>,
+    ignore: &[syn::Type],
     generic: &syn::Type,
 ) -> (TokenStream, TokenStream) {
     if ignore.is_empty() {

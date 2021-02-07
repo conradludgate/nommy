@@ -34,7 +34,7 @@ impl<P: Parse<T>, T: Clone> Parse<T> for Option<P> {
             Ok(p) => {
                 cursor.fast_forward_parent();
                 Ok(Some(p))
-            },
+            }
             _ => Ok(None),
         }
     }
@@ -86,8 +86,8 @@ impl<P> AsMut<Vec<P>> for Vec1<P> {
     }
 }
 
-impl<P> Vec1<P> {
-    pub fn into_inner(self) -> Vec<P> {
+impl<P> Into<Vec<P>> for Vec1<P> {
+    fn into(self) -> Vec<P> {
         self.0
     }
 }
@@ -128,12 +128,6 @@ impl<P: Parse<T>, T: Clone> Parse<T> for Vec1<P> {
     }
 }
 
-impl<P, T> Into<Vec<T>> for Vec1<P> where Vec<T>: From<Vec<P>> {
-    fn into(self) -> Vec<T> {
-        self.0.into()
-    }
-}
-
 impl<P: Peek<T>, T, const N: usize> Peek<T> for [P; N] {
     fn peek(input: &mut impl Buffer<T>) -> bool {
         for _ in 0..N {
@@ -159,8 +153,8 @@ impl<P: Parse<T>, T, const N: usize> Parse<T> for [P; N] {
         // therefore the array was initialised.
         unsafe {
             let mut output = MaybeUninit::uninit_array();
-            for i in 0..N {
-                *output[i].as_mut_ptr() =
+            for (i, output) in output.iter_mut().enumerate() {
+                *output.as_mut_ptr() =
                     P::parse(input).wrap_err_with(|| format!("could not parse element {}", i))?;
             }
 
@@ -224,7 +218,7 @@ mod tests {
     #[test]
     fn sequence_at_least_one() {
         let res: Vec1<Tag<".">> = parse("...".chars()).unwrap();
-        assert_eq!(res.into_inner().len(), 3);
+        assert_eq!(res.as_ref().len(), 3);
     }
 
     #[test]

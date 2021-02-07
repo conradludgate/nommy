@@ -94,7 +94,7 @@ pub fn parse_or(parse_type: &Option<syn::Type>) -> syn::Type {
                 qself: None,
                 path: syn::Path {
                     leading_colon: None,
-                    segments: segments,
+                    segments,
                 },
             })
         }

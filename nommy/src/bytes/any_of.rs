@@ -47,7 +47,7 @@ impl<const BYTES: &'static [u8]> Parse<u8> for AnyOf1<BYTES> {
             );
         }
 
-        if output.len() == 0 {
+        if output.is_empty() {
             Err(eyre::eyre!("no characters found"))
         } else {
             Ok(AnyOf1(output))

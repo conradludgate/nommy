@@ -32,7 +32,7 @@ impl<const TAG: &'static [u8]> Peek<u8> for Tag<TAG> {
 impl<const TAG: &'static [u8]> Parse<u8> for Tag<TAG> {
     fn parse(input: &mut impl Buffer<u8>) -> eyre::Result<Self> {
         let b: Vec<u8> = input.take(TAG.len()).collect();
-        if TAG == &b {
+        if TAG == b {
             Ok(Tag)
         } else {
             Err(eyre::eyre!("failed to parse tag {:?}, found {:?}", TAG, b))

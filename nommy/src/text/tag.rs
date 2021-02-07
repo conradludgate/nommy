@@ -22,7 +22,7 @@ impl<const TAG: &'static str> Peek<char> for Tag<TAG> {
 impl<const TAG: &'static str> Parse<char> for Tag<TAG> {
     fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         let s = String::from_iter(input.take(TAG.len()));
-        if TAG == &s {
+        if TAG == s {
             Ok(Tag)
         } else {
             Err(eyre::eyre!("failed to parse tag {:?}, found {:?}", TAG, s))

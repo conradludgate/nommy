@@ -97,7 +97,7 @@ impl<const CHARS: &'static str> Parse<char> for WhileNot1<CHARS> {
             }
         }
 
-        if output.len() == 0 {
+        if output.is_empty() {
             Err(eyre::eyre!("no characters found"))
         } else {
             Ok(WhileNot1(output))
@@ -152,7 +152,7 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf1<CHARS> {
             cursor.fast_forward_parent();
         }
 
-        if output.len() == 0 {
+        if output.is_empty() {
             Err(eyre::eyre!("no characters found"))
         } else {
             Ok(AnyOf1(output))

@@ -25,23 +25,26 @@ use std::{collections::VecDeque, marker::PhantomData};
 /// assert_eq!(buffer.next(), Some(0));
 /// ```
 pub trait Buffer<T>: Iterator<Item = T> + Sized {
-    // Create a new cursor from this buffer
-    // any reads the cursor makes will not
-    // affect the next values the buffer will read
+    /// Create a new cursor from this buffer
+    /// any reads the cursor makes will not
+    /// affect the next values the buffer will read
     fn cursor(&mut self) -> Cursor<T, Self> {
         Cursor::new(self)
     }
 
-    // Skip the iterator ahead by n steps
+    /// Skip the iterator ahead by n steps
     fn fast_forward(&mut self, n: usize);
 
-    // Peek ahead by i spaces
+    /// Peek ahead by i spaces
     fn peek_ahead(&mut self, i: usize) -> Option<T>;
 }
 
 /// IntoBuf is the equivalent of [IntoIterator] for a basic implementation of [Buffer]
 pub trait IntoBuf {
+    /// The iterator that the Buf type will read from
     type Iter: Iterator;
+
+    /// Convert the iterator into a [Buf]
     fn into_buf(self) -> Buf<Self::Iter>;
 }
 

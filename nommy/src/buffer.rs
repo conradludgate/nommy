@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, marker::PhantomData};
 
-/// Buffer is an extension to an [Iterator],
+/// `Buffer` is an extension to an [`Iterator`],
 /// with the ability to create a cursor over the iterator,
 /// which can infinitely read from the iterator, preserving the buffer's position
 ///
@@ -39,25 +39,25 @@ pub trait Buffer<T>: Iterator<Item = T> + Sized {
     fn peek_ahead(&mut self, i: usize) -> Option<T>;
 }
 
-/// IntoBuf is the equivalent of [IntoIterator] for a basic implementation of [Buffer]
+/// `IntoBuf` is the equivalent of [`IntoIterator`] for a basic implementation of [`Buffer`]
 pub trait IntoBuf {
-    /// The iterator that the Buf type will read from
+    /// The Iterator type that the Buf type will read from
     type Iter: Iterator;
 
-    /// Convert the iterator into a [Buf]
+    /// Convert the iterator into a [`Buf`]
     fn into_buf(self) -> Buf<Self::Iter>;
 }
 
 impl<I: IntoIterator> IntoBuf for I {
-    type Iter = I::IntoIter;
+    type Iter = <Self as IntoIterator>::IntoIter;
     fn into_buf(self) -> Buf<Self::Iter> {
         Buf::new(self)
     }
 }
 
-/// Buf is the standard implementation of [Buffer]. It stores any peeked data into a [VecDeque].
-/// Any values peeked will be stored into the [VecDeque], and next will either call [VecDeque::pop_front]
-/// or [Iterator::next] on the inner iter
+/// Buf is the standard implementation of [`Buffer`]. It stores any peeked data into a [`VecDeque`].
+/// Any values peeked will be stored into the [`VecDeque`], and next will either call [`VecDeque::pop_front`]
+/// or [`Iterator::next`] on the inner iter
 pub struct Buf<I: Iterator> {
     iter: I,
     buffer: VecDeque<I::Item>,
@@ -67,18 +67,16 @@ impl<I: Iterator> Iterator for Buf<I> {
     type Item = I::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(output) = self.buffer.pop_front() {
-            Some(output)
-        } else {
-            self.iter.next()
-        }
+        self.buffer
+            .pop_front()
+            .map_or_else(|| self.iter.next(), Some)
     }
 }
 
 impl<I: Iterator> Buf<I> {
-    /// Create a new Buf from the given [IntoIterator]
+    /// Create a new Buf from the given [`IntoIterator`]. Also see [`IntoBuf`]
     pub fn new(iter: impl IntoIterator<IntoIter = I>) -> Self {
-        Buf {
+        Self {
             iter: iter.into_iter(),
             buffer: VecDeque::new(),
         }
@@ -120,8 +118,8 @@ where
     }
 }
 
-/// Cursors are a [Buffer] that non-destructively read from their parent buffers using [Buffer::peek_ahead]
-/// See [Buffer] documentation for example usage
+/// `Cursor` is a [`Buffer`] that non-destructively reads from it's parent's buffer using [`Buffer::peek_ahead`]
+/// See [`Buffer`] documentation for example usage
 pub struct Cursor<'a, T, B: Buffer<T>> {
     buf: &'a mut B,
     index: usize,
@@ -129,8 +127,7 @@ pub struct Cursor<'a, T, B: Buffer<T>> {
 }
 
 impl<'a, T, B: Buffer<T>> Cursor<'a, T, B> {
-    /// Create a new cursor over the buffer
-    pub fn new(buf: &'a mut B) -> Self {
+    fn new(buf: &'a mut B) -> Self {
         Cursor {
             buf,
             index: 0,
@@ -138,7 +135,24 @@ impl<'a, T, B: Buffer<T>> Cursor<'a, T, B> {
         }
     }
 
-    /// Drops this cursor and calls [Buffer::fast_forward] on the parent buffer
+    /// Drops this cursor and calls [`Buffer::fast_forward`] on the parent buffer
+    ///
+    /// ```
+    /// use nommy::{Buffer, IntoBuf};
+    /// let mut input = "foobar".chars().into_buf();
+    /// let mut cursor = input.cursor();
+    /// assert_eq!(cursor.next(), Some('f'));
+    /// assert_eq!(cursor.next(), Some('o'));
+    /// assert_eq!(cursor.next(), Some('o'));
+    ///
+    /// // Typically, the next three calls to `next` would repeat
+    /// // the first three calls because cursors read non-destructively.
+    /// // However, this method allows to drop the already-read contents
+    /// cursor.fast_forward_parent();
+    /// assert_eq!(input.next(), Some('b'));
+    /// assert_eq!(input.next(), Some('a'));
+    /// assert_eq!(input.next(), Some('r'));
+    /// ```
     pub fn fast_forward_parent(self) {
         self.buf.fast_forward(self.index)
     }

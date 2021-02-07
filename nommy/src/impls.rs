@@ -1,7 +1,6 @@
-//! Implemtations of [Parse] and [Peek] for types in
+//! Implemtations of [`Parse`] and [`Peek`] for types in
 //! the rust standard library
-
-use crate::*;
+use crate::{eyre, Buffer, Context, Parse, Peek};
 use std::mem::MaybeUninit;
 
 impl<P: Peek<T>, T: Clone> Peek<T> for Option<P> {
@@ -17,7 +16,7 @@ impl<P: Peek<T>, T: Clone> Peek<T> for Option<P> {
     }
 }
 
-/// Result is None if parsing P fails, otherwise, result is Some(p)
+/// Result is `None` if parsing `P` fails, otherwise, result is `Some(p)`
 impl<P: Parse<T>, T: Clone> Parse<T> for Option<P> {
     fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self> {
         let mut cursor = input.cursor();
@@ -26,7 +25,7 @@ impl<P: Parse<T>, T: Clone> Parse<T> for Option<P> {
                 cursor.fast_forward_parent();
                 Ok(Some(p))
             }
-            _ => Ok(None),
+            Err(_) => Ok(None),
         }
     }
 }
@@ -44,15 +43,15 @@ impl<P: Peek<T>, T> Peek<T> for Vec<P> {
     }
 }
 
-/// Repeatedly attempts to parse P, Result is all successful attempts
+/// Repeatedly attempts to parse `P`, Result is all successful attempts
 impl<P: Parse<T>, T: Clone> Parse<T> for Vec<P> {
     fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self> {
-        let mut output = vec![];
+        let mut output = Self::new();
         loop {
             let mut cursor = input.cursor();
             match P::parse(&mut cursor) {
                 Ok(p) => output.push(p),
-                _ => break,
+                Err(_) => break,
             }
             cursor.fast_forward_parent();
         }
@@ -61,7 +60,7 @@ impl<P: Parse<T>, T: Clone> Parse<T> for Vec<P> {
     }
 }
 
-/// Vec1 is similar to `Vec` but implements `Parse` such that it will error if it fails to parse at least once
+/// Vec1 is similar to [`Vec`] but implements [`Parse`] such that it will error if it fails to parse at least once
 #[derive(Debug, Clone, PartialEq)]
 pub struct Vec1<P>(Vec<P>);
 
@@ -101,8 +100,8 @@ impl<P: Peek<T>, T: Clone> Peek<T> for Vec1<P> {
     }
 }
 
-/// Repeatedly attempt to parse P, Result is all successful attempts
-/// Must parse P at least once
+/// Repeatedly attempt to parse `P`, Result is all successful attempts
+/// Must parse `P` at least once
 impl<P: Parse<T>, T: Clone> Parse<T> for Vec1<P> {
     fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self> {
         let mut output = vec![P::parse(input)?];
@@ -110,12 +109,12 @@ impl<P: Parse<T>, T: Clone> Parse<T> for Vec1<P> {
             let mut cursor = input.cursor();
             match P::parse(&mut cursor) {
                 Ok(p) => output.push(p),
-                _ => break,
+                Err(_) => break,
             }
             cursor.fast_forward_parent();
         }
 
-        Ok(Vec1(output))
+        Ok(Self(output))
     }
 }
 
@@ -131,11 +130,11 @@ impl<P: Peek<T>, T, const N: usize> Peek<T> for [P; N] {
     }
 }
 
-/// Parse P N times into [P; N], fails if any step fails
+/// Parse `P` `N` times into `[P; N]`, fails if any step fails
 ///
 /// ```
-/// use nommy::{parse, text::Tag};
-/// let _: [Tag<".">; 3] = parse("...".chars()).unwrap();
+/// use nommy::{parse_terminated, text::Tag};
+/// let _: [Tag<".">; 3] = parse_terminated("...".chars()).unwrap();
 /// ```
 impl<P: Parse<T>, T, const N: usize> Parse<T> for [P; N] {
     fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self> {
@@ -157,7 +156,7 @@ impl<P: Parse<T>, T, const N: usize> Parse<T> for [P; N] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::text::Tag;
+    use crate::{parse, text::Tag, IntoBuf};
 
     #[test]
     fn option() {

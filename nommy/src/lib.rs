@@ -1,9 +1,11 @@
+#![allow(incomplete_features)]
 #![feature(array_map)]
 #![feature(maybe_uninit_uninit_array)]
 #![feature(maybe_uninit_array_assume_init)]
-#![allow(incomplete_features)]
 #![feature(const_generics)]
 #![deny(missing_docs)]
+#![warn(clippy::pedantic)]
+#![warn(clippy::nursery)]
 
 //! Type based parsing library
 //!
@@ -121,12 +123,16 @@ pub use nommy_derive::Parse;
 
 pub use eyre;
 
-/// parse takes the given iterator, putting it through `P::parse`
+/// `parse` takes the given iterator, putting it through [`P::parse`](Parse::parse)
 ///
 /// ```
 /// use nommy::{parse, text::Tag};
 /// let dot: Tag<"."> = parse(".".chars()).unwrap();
 /// ```
+///
+/// # Errors
+/// If `P` failed to parse the input at any point, that error will
+/// be propagated up the chain.
 pub fn parse<P, I>(iter: I) -> eyre::Result<P>
 where
     P: Parse<<I::Iter as Iterator>::Item>,
@@ -136,7 +142,7 @@ where
     P::parse(&mut iter.into_buf())
 }
 
-/// parse_terminated takes the given iterator, putting it through `P::parse`,
+/// `parse_terminated` takes the given iterator, putting it through [`P::parse`](Parse::parse),
 /// erroring if the full input was not consumed
 ///
 /// ```
@@ -146,6 +152,12 @@ where
 /// let res: Result<Tag<".">, _> = parse_terminated("..".chars());
 /// res.unwrap_err();
 /// ```
+///
+/// # Errors
+/// If `P` failed to parse the input at any point, that error will
+/// be propagated up the chain.
+///
+/// Will also error if the input is not empty after parsing
 pub fn parse_terminated<P, I>(iter: I) -> eyre::Result<P>
 where
     P: Parse<<I::Iter as Iterator>::Item>,
@@ -162,7 +174,7 @@ where
 }
 
 /// An interface for creating and composing parsers
-/// Takes in a [Buffer] iterator and consumes a subset of it,
+/// Takes in a [`Buffer`] iterator and consumes a subset of it,
 /// Returning Self if it managed to parse ok, otherwise returning a meaningful error
 /// Parse can be derived for some types
 ///
@@ -174,19 +186,20 @@ where
 pub trait Parse<T>: Sized + Peek<T> {
     /// Parse the input buffer, returning Ok if the value could be parsed,
     /// Otherwise, returns a meaningful error
+    ///
+    /// # Errors
+    /// Will return an error if the parser fails to interpret the input at any point
     fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self>;
 }
 
-/// An interface with dealing with parser-peeking.
-/// The required function [peek](Peek::peek) takes in a [Cursor] iterator
-/// and will attempt to loosely parse the data provided,
-/// asserting that if the equivalent [Buffer] is given to
-/// the [Parse::parse] function, it should succeed.
+/// A weaker version of [`Parse`]. It reads from the input,
+/// returning whether the equivalent [`Parse::parse`] function
+/// would return Ok.
 ///
 /// ```
 /// use nommy::{Peek, Buffer, IntoBuf, text::Tag};
 /// let mut buffer = ".".chars().into_buf();
-/// assert!(Tag::<".">::peek(&mut buffer.cursor()));
+/// assert!(Tag::<".">::peek(&mut buffer));
 /// ```
 pub trait Peek<T>: Sized {
     /// Peek reads the input buffer, returning true if the value could be found,

@@ -3,7 +3,7 @@
 use nommy::{text::*, *};
 
 #[derive(Debug, PartialEq, Parse)]
-#[nommy(suffix = Tag<",">, parse_type = char)]
+#[nommy(suffix = Tag<",">)]
 #[nommy(ignore = WhiteSpace)]
 enum JSON {
     #[nommy(prefix = Tag<"null">)]
@@ -13,14 +13,14 @@ enum JSON {
     Object(Vec<Record>),
 
     #[nommy(prefix = Tag<"[">, suffix = Tag<"]">)]
-    List(Vec<JSON>),
+    List(#[nommy(inner_parser = JSON)] Vec<JSON>),
 
     String(#[nommy(parser = StringParser)] String),
     // Num(f64),
 }
 
 #[derive(Debug, PartialEq, Parse)]
-#[nommy(ignore = WhiteSpace, parse_type = char)]
+#[nommy(ignore = WhiteSpace)]
 struct Record {
     #[nommy(parser = StringParser)]
     #[nommy(suffix = Tag<":">)]

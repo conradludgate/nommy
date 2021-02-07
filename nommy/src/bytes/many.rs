@@ -1,9 +1,9 @@
-use crate::*;
+use crate::{eyre, Buffer, Parse, Peek};
 
 use super::OneOf;
 
 #[derive(Debug, Clone, PartialEq)]
-/// AnyOf1 is a generic type that implements Parse to match many characters within the given string
+/// `AnyOf1` is a generic type that implements [`Parse`] to match many characters within the given string
 ///
 /// ```
 /// use nommy::{Parse, IntoBuf, bytes::AnyOf1};
@@ -50,7 +50,7 @@ impl<const BYTES: &'static [u8]> Parse<u8> for AnyOf1<BYTES> {
         if output.is_empty() {
             Err(eyre::eyre!("no characters found"))
         } else {
-            Ok(AnyOf1(output))
+            Ok(Self(output))
         }
     }
 }

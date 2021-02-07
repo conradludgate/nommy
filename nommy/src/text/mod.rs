@@ -4,10 +4,10 @@ mod tag;
 pub use tag::*;
 mod one_of;
 pub use one_of::*;
-mod any_of;
-pub use any_of::*;
+mod many;
+pub use many::*;
 
-use crate::*;
+use crate::{Buffer, Parse, Peek, eyre};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 /// Parses newline `"\n"` or carriage return `"\r\n"`
@@ -26,10 +26,10 @@ impl Peek<char> for LineEnding {
 impl Parse<char> for LineEnding {
     fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         match input.next() {
-            Some('\n') => Ok(LineEnding),
+            Some('\n') => Ok(Self),
             Some('\r') => {
                 if input.next() == Some('\n') {
-                    Ok(LineEnding)
+                    Ok(Self)
                 } else {
                     Err(eyre::eyre!("could not parse lineending"))
                 }
@@ -52,7 +52,7 @@ impl Peek<char> for Space {
 impl Parse<char> for Space {
     fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         match input.next() {
-            Some(' ') | Some('\t') => Ok(Space),
+            Some(' ') | Some('\t') => Ok(Self),
             _ => Err(eyre::eyre!("could not parse space or tab")),
         }
     }
@@ -76,10 +76,10 @@ impl Peek<char> for WhiteSpace {
 impl Parse<char> for WhiteSpace {
     fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         match input.next() {
-            Some(' ') | Some('\t') | Some('\n') => Ok(WhiteSpace),
+            Some(' ') | Some('\t') | Some('\n') => Ok(Self),
             Some('\r') => {
                 if input.next() == Some('\n') {
-                    Ok(WhiteSpace)
+                    Ok(Self)
                 } else {
                     Err(eyre::eyre!("could not parse whitespace"))
                 }
@@ -92,6 +92,7 @@ impl Parse<char> for WhiteSpace {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::IntoBuf;
 
     #[test]
     fn parse_spaces() {

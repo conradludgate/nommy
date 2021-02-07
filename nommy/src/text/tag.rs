@@ -1,9 +1,9 @@
 use std::iter::FromIterator;
 
-use crate::*;
+use crate::{eyre, Buffer, Parse, Peek};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-/// Tag is a generic type that implements Parse to match the given string exactly
+/// `Tag` is a generic type that implements [`Parse`] to match the given string exactly
 ///
 /// ```
 /// use nommy::{Parse, IntoBuf, text::Tag};
@@ -23,7 +23,7 @@ impl<const TAG: &'static str> Parse<char> for Tag<TAG> {
     fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
         let s = String::from_iter(input.take(TAG.len()));
         if TAG == s {
-            Ok(Tag)
+            Ok(Self)
         } else {
             Err(eyre::eyre!("failed to parse tag {:?}, found {:?}", TAG, s))
         }
@@ -33,7 +33,7 @@ impl<const TAG: &'static str> Parse<char> for Tag<TAG> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{parse, Buffer, Parse};
+    use crate::{parse, IntoBuf, Parse};
 
     #[test]
     fn test_parse_matches() {
@@ -67,9 +67,15 @@ mod tests {
     #[test]
     fn test_parse_errors() {
         let res: Result<Tag<"(">, _> = parse("1".chars());
-        assert_eq!(format!("{}", res.unwrap_err()), "failed to parse tag \"(\", found \"1\"");
+        assert_eq!(
+            format!("{}", res.unwrap_err()),
+            "failed to parse tag \"(\", found \"1\""
+        );
 
         let res: Result<Tag<")">, _> = parse("1".chars());
-        assert_eq!(format!("{}", res.unwrap_err()), "failed to parse tag \")\", found \"1\"");
+        assert_eq!(
+            format!("{}", res.unwrap_err()),
+            "failed to parse tag \")\", found \"1\""
+        );
     }
 }

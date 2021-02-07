@@ -1,9 +1,9 @@
-use crate::*;
+use crate::{eyre, Buffer, Parse, Peek};
 
 use super::OneOf;
 
 #[derive(Debug, Clone, PartialEq)]
-/// AnyOf is a generic type that implements Parse to match many characters within the given string
+/// `AnyOf` is a generic type that implements [`Parse`] to match many characters within the given string
 ///
 /// ```
 /// use nommy::{Parse, IntoBuf, text::AnyOf};
@@ -40,22 +40,22 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf<CHARS> {
             let mut cursor = input.cursor();
             match OneOf::<CHARS>::parse(&mut cursor) {
                 Ok(c) => output.push(c.into()),
-                _ => break,
+                Err(_) => break,
             }
             cursor.fast_forward_parent();
         }
 
-        Ok(AnyOf(output))
+        Ok(Self(output))
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-/// AnyOf is a generic type that implements Parse to match many characters within the given string
+/// `WhileNot1` is a generic type that implements [`Parse`] to match many characters not within the given string
 ///
 /// ```
-/// use nommy::{Parse, IntoBuf, text::AnyOf};
+/// use nommy::{Parse, IntoBuf, text::WhileNot1};
 /// let mut buffer = "-_-.".chars().into_buf();
-/// let c: String = AnyOf::<"-_">::parse(&mut buffer).unwrap().into();
+/// let c: String = WhileNot1::<".">::parse(&mut buffer).unwrap().into();
 /// assert_eq!(c, "-_-");
 /// ```
 pub struct WhileNot1<const CHARS: &'static str>(String);
@@ -96,14 +96,13 @@ impl<const CHARS: &'static str> Parse<char> for WhileNot1<CHARS> {
         if output.is_empty() {
             Err(eyre::eyre!("no characters found"))
         } else {
-            Ok(WhileNot1(output))
+            Ok(Self(output))
         }
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq)]
-/// AnyOf1 is a generic type that implements Parse to match many characters within the given string
+/// `AnyOf1` is a generic type that implements [`Parse`] to match many characters within the given string
 ///
 /// ```
 /// use nommy::{Parse, IntoBuf, text::AnyOf1};
@@ -143,7 +142,7 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf1<CHARS> {
             let mut cursor = input.cursor();
             match OneOf::<CHARS>::parse(&mut cursor) {
                 Ok(c) => output.push(c.into()),
-                _ => break,
+                Err(_) => break,
             }
             cursor.fast_forward_parent();
         }
@@ -151,7 +150,7 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf1<CHARS> {
         if output.is_empty() {
             Err(eyre::eyre!("no characters found"))
         } else {
-            Ok(AnyOf1(output))
+            Ok(Self(output))
         }
     }
 }
@@ -159,6 +158,7 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf1<CHARS> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::IntoBuf;
 
     #[test]
     fn any_of_peek() {

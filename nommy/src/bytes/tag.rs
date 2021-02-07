@@ -1,7 +1,7 @@
-use crate::*;
+use crate::{eyre, Buffer, Parse, Peek};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-/// Tag is a generic type that implements Parse to match the given string exactly
+/// `Tag` is a generic type that implements [`Parse`] to match the given string exactly
 ///
 /// ```
 /// use nommy::{Parse, IntoBuf, bytes::Tag};
@@ -21,7 +21,7 @@ impl<const TAG: &'static [u8]> Parse<u8> for Tag<TAG> {
     fn parse(input: &mut impl Buffer<u8>) -> eyre::Result<Self> {
         let b: Vec<u8> = input.take(TAG.len()).collect();
         if TAG == b {
-            Ok(Tag)
+            Ok(Self)
         } else {
             Err(eyre::eyre!("failed to parse tag {:?}, found {:?}", TAG, b))
         }
@@ -31,7 +31,7 @@ impl<const TAG: &'static [u8]> Parse<u8> for Tag<TAG> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{parse, Parse};
+    use crate::{parse, IntoBuf, Parse};
 
     #[test]
     fn test_parse_matches() {

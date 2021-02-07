@@ -1,7 +1,7 @@
-use crate::*;
+use crate::{eyre, Buffer, Parse, Peek};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-/// OneOf is a generic type that implements Parse to match one character within the given string
+/// `OneOf` is a generic type that implements [`Parse`] to match one character within the given string
 ///
 /// ```
 /// use nommy::{Parse, IntoBuf, text::OneOf};
@@ -31,7 +31,7 @@ impl<const CHARS: &'static str> Parse<char> for OneOf<CHARS> {
         match input.next() {
             Some(c) => {
                 if CHARS.contains(c) {
-                    Ok(OneOf(c))
+                    Ok(Self(c))
                 } else {
                     Err(eyre::eyre!(
                         "error parsing one of {:?}, found {:?}",

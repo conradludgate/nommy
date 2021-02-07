@@ -10,11 +10,7 @@ use quote::{format_ident, quote, ToTokens};
 use unit::EnumVariantUnit;
 use unnamed::EnumVariantUnnamed;
 
-use crate::{
-    attr::GlobalAttr,
-    fn_impl::{parse_or, BuildOutput, FnImpl},
-    parsers::FunctionBuilder,
-};
+use crate::{attr::GlobalAttr, fn_impl::{parse_or, BuildOutput, FnImpl}, parsers::{FunctionBuilder, ignore_impl}};
 
 pub struct Enum {
     pub attrs: GlobalAttr,
@@ -85,11 +81,16 @@ impl ToTokens for Enum {
                     a
                 });
 
-        let mut parse_builder = FunctionBuilder::new_parser(&mut parse_wc, generic, &attrs.ignore);
+        let mut ignore_wc = TokenStream::new();
+        let (ignore, after_each) = ignore_impl(&mut ignore_wc, &attrs.ignore, generic);
+        parse_wc.extend(ignore_wc.clone());
+        peek_wc.extend(ignore_wc);
+
+        let mut parse_builder = FunctionBuilder::new(&mut parse_wc, generic, after_each.clone());
         let parse_prefix = parse_builder.parse_fix(&attrs.prefix, "prefix", &name.to_string());
         let parse_suffix = parse_builder.parse_fix(&attrs.suffix, "suffix", &name.to_string());
 
-        let mut peek_builder = FunctionBuilder::new_peeker(&mut peek_wc, generic, &attrs.ignore);
+        let mut peek_builder = FunctionBuilder::new(&mut peek_wc, generic, after_each);
         let peek_prefix = peek_builder.peek_fix(&attrs.prefix);
         let peek_suffix = peek_builder.peek_fix(&attrs.suffix);
 
@@ -98,6 +99,8 @@ impl ToTokens for Enum {
             impl <#generic, #(#args),*> ::nommy::Peek<#generic> for #name<#(#args),*>
             where #peek_wc {
                 fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
+                    #ignore
+
                     #peek_prefix
 
                     if #( !Self::#var_names_peek(&mut input.cursor()) )&&* {
@@ -115,6 +118,7 @@ impl ToTokens for Enum {
             where #parse_wc {
                 fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
                     use ::nommy::eyre::WrapErr;
+                    #ignore
 
                     #parse_prefix
 

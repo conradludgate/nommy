@@ -4,7 +4,7 @@ type Letters = AnyOf1<"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ">;
 
 #[derive(Debug, Parse, PartialEq)]
 #[nommy(prefix = Tag<"struct">)]
-#[nommy(ignore = WhiteSpaces)]
+#[nommy(ignore = WhiteSpace)]
 struct StructNamed {
     #[nommy(parser = Letters)]
     name: String,
@@ -15,7 +15,7 @@ struct StructNamed {
 
 #[derive(Debug, Parse, PartialEq)]
 #[nommy(suffix = Tag<",">)]
-#[nommy(ignore = WhiteSpaces)]
+#[nommy(ignore = WhiteSpace)]
 struct NamedField {
     #[nommy(parser = Letters)]
     name: String,
@@ -26,7 +26,7 @@ struct NamedField {
 
 #[derive(Debug, Parse, PartialEq)]
 #[nommy(prefix = Tag<"struct">)]
-#[nommy(ignore = WhiteSpaces)]
+#[nommy(ignore = WhiteSpace)]
 struct StructUnnamed {
     #[nommy(parser = Letters)]
     name: String,
@@ -37,7 +37,7 @@ struct StructUnnamed {
 
 #[derive(Debug, Parse, PartialEq)]
 #[nommy(suffix = Option<Tag<",">>)]
-#[nommy(ignore = WhiteSpaces)]
+#[nommy(ignore = WhiteSpace)]
 struct UnnamedField {
     #[nommy(parser = Letters)]
     ty: String,
@@ -45,7 +45,7 @@ struct UnnamedField {
 
 #[derive(Debug, Parse, PartialEq)]
 #[nommy(prefix = Tag<"enum">)]
-#[nommy(ignore = WhiteSpaces)]
+#[nommy(ignore = WhiteSpace)]
 struct Enum {
     #[nommy(parser = Letters)]
     name: String,
@@ -55,7 +55,7 @@ struct Enum {
 }
 
 #[derive(Debug, Parse, PartialEq)]
-#[nommy(ignore = WhiteSpaces)]
+#[nommy(ignore = WhiteSpace)]
 struct Variant {
     #[nommy(parser = Letters)]
     name: String,
@@ -64,15 +64,15 @@ struct Variant {
 }
 #[derive(Debug, Parse, PartialEq)]
 enum VariantType {
-    #[nommy(ignore = WhiteSpaces)]
+    #[nommy(ignore = WhiteSpace)]
     Struct(#[nommy(prefix = Tag<"{">, suffix = Tag<"}">)] Vec<NamedField>),
 
     #[nommy(suffix = Tag<",">)]
-    #[nommy(ignore = WhiteSpaces)]
+    #[nommy(ignore = WhiteSpace)]
     Tuple(#[nommy(prefix = Tag<"(">, suffix = Tag<")">)] Vec<UnnamedField>),
 
     #[nommy(suffix = Tag<",">)]
-    #[nommy(ignore = WhiteSpaces)]
+    #[nommy(ignore = WhiteSpace)]
     Unit,
 }
 

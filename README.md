@@ -8,7 +8,7 @@ type Letters = AnyOf1<"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ">;
 
 #[derive(Debug, Parse, PartialEq)]
 #[nommy(prefix = Tag<"struct">)]
-#[nommy(ignore = WhiteSpaces)]
+#[nommy(ignore = WhiteSpace)]
 struct StructNamed {
     #[nommy(parser = Letters)]
     name: String,
@@ -19,7 +19,7 @@ struct StructNamed {
 
 #[derive(Debug, Parse, PartialEq)]
 #[nommy(suffix = Tag<",">)]
-#[nommy(ignore = WhiteSpaces)]
+#[nommy(ignore = WhiteSpace)]
 struct NamedField {
     #[nommy(parser = Letters)]
     name: String,

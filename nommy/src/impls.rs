@@ -40,7 +40,7 @@ impl<P: Parse<T>, T: Clone> Parse<T> for Option<P> {
     }
 }
 
-impl<P: Peek<T>, T: Clone> Peek<T> for Vec<P> {
+impl<P: Peek<T>, T> Peek<T> for Vec<P> {
     fn peek(input: &mut impl Buffer<T>) -> bool {
         loop {
             let mut cursor = input.cursor();

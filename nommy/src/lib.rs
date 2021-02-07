@@ -13,7 +13,7 @@
 //!
 //! #[derive(Debug, Parse, PartialEq)]
 //! #[nommy(prefix = Tag<"struct">)]
-//! #[nommy(ignore = WhiteSpaces)]
+//! #[nommy(ignore = WhiteSpace)]
 //! struct StructNamed {
 //!     #[nommy(parser = Letters)]
 //!     name: String,
@@ -24,7 +24,7 @@
 //!
 //! #[derive(Debug, Parse, PartialEq)]
 //! #[nommy(suffix = Tag<",">)]
-//! #[nommy(ignore = WhiteSpaces)]
+//! #[nommy(ignore = WhiteSpace)]
 //! struct NamedField {
 //!     #[nommy(parser = Letters)]
 //!     name: String,
@@ -74,7 +74,7 @@ pub use impls::Vec1;
 ///
 /// #[derive(Debug, Parse, PartialEq)]
 /// #[nommy(prefix = Tag<"struct">)]
-/// #[nommy(ignore = WhiteSpaces)]
+/// #[nommy(ignore = WhiteSpace)]
 /// struct StructNamed {
 ///     #[nommy(parser = Letters)]
 ///     name: String,
@@ -85,7 +85,7 @@ pub use impls::Vec1;
 ///
 /// #[derive(Debug, Parse, PartialEq)]
 /// #[nommy(suffix = Tag<",">)]
-/// #[nommy(ignore = WhiteSpaces)]
+/// #[nommy(ignore = WhiteSpace)]
 /// struct NamedField {
 ///     #[nommy(parser = Letters)]
 ///     name: String,

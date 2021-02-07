@@ -1,10 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-use crate::{
-    attr::GlobalAttr,
-    parsers::{FieldType, FunctionBuilder},
-};
+use crate::{attr::GlobalAttr, parsers::{FieldType, FunctionBuilder, ignore_impl}};
 
 pub struct BuildOutput {
     pub fn_impl: TokenStream,
@@ -27,9 +24,12 @@ pub trait FnImpl<F: FieldType>: Sized {
         let name = self.name();
         let attrs = self.attrs();
 
-        let mut builder = FunctionBuilder::new_parser(&mut wc, self.generic(), &attrs.ignore);
+        let (ignore, after_each) = ignore_impl(&mut wc, &attrs.ignore, self.generic());
+
+        let mut builder = FunctionBuilder::new(&mut wc, self.generic(), after_each);
 
         let mut tokens = TokenStream::new();
+        tokens.extend(ignore);
 
         tokens.extend(builder.parse_fix(
             &attrs.prefix,
@@ -59,9 +59,11 @@ pub trait FnImpl<F: FieldType>: Sized {
         let mut wc = TokenStream::new();
         let attrs = self.attrs();
 
-        let mut builder = FunctionBuilder::new_peeker(&mut wc, self.generic(), &attrs.ignore);
+        let (ignore, after_each) = ignore_impl(&mut wc, &attrs.ignore, self.generic());
+        let mut builder = FunctionBuilder::new(&mut wc, self.generic(), after_each);
 
         let mut tokens = TokenStream::new();
+        tokens.extend(ignore);
 
         tokens.extend(builder.peek_fix(&attrs.prefix));
 

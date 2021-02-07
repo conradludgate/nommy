@@ -79,43 +79,11 @@ pub struct FunctionBuilder<'a> {
 }
 
 impl<'a> FunctionBuilder<'a> {
-    pub fn new_parser(wc: &'a mut TokenStream, generic: &'a syn::Type, ignore: &Vec<syn::Type>) -> Self {
-        let mut after_each = TokenStream::new();
-
-        // TODO: reform this
-        // Ignore should take in the single tokens,
-        // then generate an enum of these tokens
-        // then parse many of them
-        for ty in ignore {
-            wc.extend(peek_where_tokens(&ty, &generic));
-            after_each.extend(parser_peek_tokens(
-                &ty,
-                &generic,
-                "failed to parse 'ignore' tokens",
-            ))
-        }
-
-        FunctionBuilder {
-            wc,
-            generic,
-            after_each,
-        }
-    }
-    pub fn new_peeker(wc: &'a mut TokenStream, generic: &'a syn::Type, ignore: &Vec<syn::Type>) -> Self {
-        let mut after_each = TokenStream::new();
-
-        // TODO: reform this
-        // Ignore should take in the single tokens,
-        // then generate an enum of these tokens
-        // then parse many of them
-        for ty in ignore {
-            wc.extend(peek_where_tokens(&ty, &generic));
-            after_each.extend(peeker_peek_tokens(
-                &ty,
-                &generic,
-            ))
-        }
-
+    pub fn new(
+        wc: &'a mut TokenStream,
+        generic: &'a syn::Type,
+        after_each: TokenStream,
+    ) -> Self {
         FunctionBuilder {
             wc,
             generic,
@@ -251,11 +219,7 @@ fn parser_peek_tokens(ty: &syn::Type, generic: &syn::Type, error: &str) -> Token
     }
 }
 /// section of a parser impl
-fn parser_parse_vec_tokens(
-    name: &syn::Ident,
-    ty: &syn::Type,
-    generic: &syn::Type,
-) -> TokenStream {
+fn parser_parse_vec_tokens(name: &syn::Ident, ty: &syn::Type, generic: &syn::Type) -> TokenStream {
     quote! {
         let mut #name = ::std::vec::Vec::new();
         loop {
@@ -284,10 +248,7 @@ fn _peeker_parse_tokens(name: &syn::Ident, ty: &syn::Type, generic: &syn::Type) 
     }
 }
 /// section of a peeker impl
-fn peeker_peek_vec_tokens(
-    ty: &syn::Type,
-    generic: &syn::Type,
-) -> TokenStream {
+fn peeker_peek_vec_tokens(ty: &syn::Type, generic: &syn::Type) -> TokenStream {
     quote! {
         loop {
             let mut cursor = input.cursor();
@@ -297,4 +258,46 @@ fn peeker_peek_vec_tokens(
             cursor.fast_forward_parent()
         }
     }
+}
+
+pub fn ignore_impl(
+    wc: &mut TokenStream,
+    ignore: &Vec<syn::Type>,
+    generic: &syn::Type,
+) -> (TokenStream, TokenStream) {
+    if ignore.is_empty() {
+        return (TokenStream::new(), TokenStream::new())
+    }
+
+    let mut ignore_impl = TokenStream::new();
+    let mut ignore_wc = TokenStream::new();
+    for ty in ignore {
+        wc.extend(peek_where_tokens(&ty, &generic));
+        ignore_wc.extend(peek_where_tokens(&ty, &generic));
+        ignore_impl.extend(quote! {
+            {
+                let mut cursor = input.cursor();
+                if <#ty as ::nommy::Peek<#generic>>::peek(&mut cursor) {
+                    cursor.fast_forward_parent();
+                    return true
+                }
+            }
+        });
+    }
+    let ignore_impl = quote! {
+        struct __ParseIgnore;
+        impl<#generic> ::nommy::Peek<#generic> for __ParseIgnore where #ignore_wc {
+            fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
+                #ignore_impl
+
+                false
+            }
+        }
+    };
+
+    let after_each = quote! {
+        <::std::vec::Vec<__ParseIgnore> as ::nommy::Peek<#generic>>::peek(input);
+    };
+
+    (ignore_impl, after_each)
 }

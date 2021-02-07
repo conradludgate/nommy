@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use nommy::{Buffer, Parse, Peek, parse, text::{AnyOf1, Tag, WhileNot1, Spaces}};
+use nommy::{Buffer, Parse, Peek, parse, text::{AnyOf1, Tag, WhileNot1, Space}};
 
 type Letters = AnyOf1<"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_">;
 type Path = AnyOf1<"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ/%-_+1234567890">;
@@ -48,7 +48,7 @@ struct HTTP {
 
 
 #[derive(Debug, Parse)]
-#[nommy(ignore = Spaces)]
+#[nommy(ignore = Space)]
 #[nommy(prefix = Tag<"\n">)]
 struct Header {
     #[nommy(parser = Letters)]
@@ -60,7 +60,7 @@ struct Header {
 }
 
 #[derive(Debug, Parse)]
-#[nommy(ignore = Spaces)]
+#[nommy(ignore = Space)]
 #[nommy(suffix = Option<Tag<",">>)]
 struct HeaderValue {
     #[nommy(parser = WhileNot1<",\n">)]

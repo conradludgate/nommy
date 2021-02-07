@@ -1,4 +1,4 @@
-//! Implemtations of [Parse], [Peek] and [Process] for types in
+//! Implemtations of [Parse] and [Peek] for types in
 //! the rust standard library
 
 use crate::*;

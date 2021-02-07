@@ -4,7 +4,6 @@
 #![allow(incomplete_features)]
 #![feature(const_generics)]
 #![deny(missing_docs)]
-#![deny(missing_doc_code_examples)]
 
 //! Type based parsing library
 //!

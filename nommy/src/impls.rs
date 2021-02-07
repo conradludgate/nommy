@@ -2,16 +2,7 @@
 //! the rust standard library
 
 use crate::*;
-use std::{fmt, mem::MaybeUninit};
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct EnumParseError;
-impl std::error::Error for EnumParseError {}
-impl fmt::Display for EnumParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "no variants of the enum could be parsed")
-    }
-}
+use std::mem::MaybeUninit;
 
 impl<P: Peek<T>, T: Clone> Peek<T> for Option<P> {
     fn peek(input: &mut impl Buffer<T>) -> bool {

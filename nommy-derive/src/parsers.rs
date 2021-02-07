@@ -175,17 +175,22 @@ impl<'a> FunctionBuilder<'a> {
 
         tokens.extend(self.parse_fix(&attrs.prefix, "prefix", &format!("field `{}`", name)));
 
-        let parser = match &attrs.parser {
-            Some(p) => p,
-            None => ty,
-        };
-        self.parse_where(&parser);
-        tokens.extend(parser_parse_tokens(
-            &name,
-            &parser,
-            &self.generic,
-            &format!("failed to parse field `{}`", name),
-        ));
+        if attrs.vec.is_some() {
+            let parser: Option<&syn::Type> = (&attrs.vec.parser).into();
+            let parser = parser.unwrap();
+            self.parse_where(&parser);
+            tokens.extend(parser_parse_vec_tokens(&name, &parser, &self.generic));
+        } else {
+            let parser: Option<&syn::Type> = (&attrs.parser).into();
+            let parser = parser.unwrap_or(&ty);
+            self.parse_where(&parser);
+            tokens.extend(parser_parse_tokens(
+                &name,
+                &parser,
+                &self.generic,
+                &format!("failed to parse field `{}`", name),
+            ));
+        }
 
         tokens.extend(self.after_each.clone());
 
@@ -202,12 +207,17 @@ impl<'a> FunctionBuilder<'a> {
 
         tokens.extend(self.peek_fix(&attrs.prefix));
 
-        let parser = match &attrs.parser {
-            Some(p) => p,
-            None => ty,
-        };
-        self.peek_where(&parser);
-        tokens.extend(peeker_peek_tokens(&parser, &self.generic));
+        if attrs.vec.is_some() {
+            let parser: Option<&syn::Type> = (&attrs.vec.parser).into();
+            let parser = parser.unwrap();
+            self.peek_where(&parser);
+            tokens.extend(peeker_peek_vec_tokens(&parser, &self.generic));
+        } else {
+            let parser: Option<&syn::Type> = (&attrs.parser).into();
+            let parser = parser.unwrap_or(&ty);
+            self.peek_where(&parser);
+            tokens.extend(peeker_peek_tokens(&parser, &self.generic));
+        }
 
         tokens.extend(self.after_each.clone());
 
@@ -240,18 +250,51 @@ fn parser_peek_tokens(ty: &syn::Type, generic: &syn::Type, error: &str) -> Token
         if !(<#ty as ::nommy::Peek<#generic>>::peek(input)) { return Err(::nommy::eyre::eyre!(#error)) }
     }
 }
+/// section of a parser impl
+fn parser_parse_vec_tokens(
+    name: &syn::Ident,
+    ty: &syn::Type,
+    generic: &syn::Type,
+) -> TokenStream {
+    quote! {
+        let mut #name = ::std::vec::Vec::new();
+        loop {
+            let mut cursor = input.cursor();
+            match <#ty as ::nommy::Parse<#generic>>::parse(&mut cursor) {
+                Ok(p) => #name.push(p.into()),
+                _ => break,
+            }
+            cursor.fast_forward_parent();
+        };
+    }
+}
 /// section of a peeker impl
 fn peeker_peek_tokens(ty: &syn::Type, generic: &syn::Type) -> TokenStream {
     quote! {
         if !(<#ty as ::nommy::Peek<#generic>>::peek(input)) { return false }
     }
 }
-/// section of a parser impl
+/// section of a peeker impl
 fn _peeker_parse_tokens(name: &syn::Ident, ty: &syn::Type, generic: &syn::Type) -> TokenStream {
     quote! {
         let #name = match <#ty as ::nommy::Parse<#generic>>::parse(input) {
             Ok(v) => v,
             _ => return false,
         };
+    }
+}
+/// section of a peeker impl
+fn peeker_peek_vec_tokens(
+    ty: &syn::Type,
+    generic: &syn::Type,
+) -> TokenStream {
+    quote! {
+        loop {
+            let mut cursor = input.cursor();
+            if !<#ty as ::nommy::Peek<#generic>>::peek(&mut cursor) {
+                break;
+            }
+            cursor.fast_forward_parent()
+        }
     }
 }

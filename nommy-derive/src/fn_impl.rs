@@ -39,11 +39,7 @@ pub trait FnImpl<F: FieldType>: Sized {
 
         let fields = self.fields();
         for (i, field) in fields.iter().enumerate() {
-            if field.attrs().vec.is_some() {
-                // tokens.extend(builder.vec_field(field, i))
-            } else {
-                tokens.extend(builder.parse_field(field, i))
-            }
+            tokens.extend(builder.parse_field(field, i))
         }
 
         tokens.extend(builder.parse_fix(
@@ -71,11 +67,7 @@ pub trait FnImpl<F: FieldType>: Sized {
 
         let fields = self.fields();
         for (i, field) in fields.iter().enumerate() {
-            if field.attrs().vec.is_some() {
-                // tokens.extend(builder.vec_field(field, i))
-            } else {
-                tokens.extend(builder.peek_field(field, i))
-            }
+            tokens.extend(builder.peek_field(field, i))
         }
 
         tokens.extend(builder.peek_fix(&attrs.suffix));

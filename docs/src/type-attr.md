@@ -6,7 +6,7 @@ There's currently only 3 supported type attributes
 
 `ignore` lets you specify how to parse the tokens that you don't care about.
 
-For example, ignoreing whitespace:
+For example, ignoring whitespace:
 
 ```rust
 #use nommy::{Parse, IntoBuf, text::{Tag, WhiteSpace}};

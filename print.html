@@ -97,7 +97,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="nommy.html"><strong aria-hidden="true">1.</strong> nommy</a></li><li class="chapter-item expanded "><a href="ideology.html"><strong aria-hidden="true">2.</strong> Ideology</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="buffers.html"><strong aria-hidden="true">2.1.</strong> Buffers</a></li><li class="chapter-item expanded "><a href="parsers.html"><strong aria-hidden="true">2.2.</strong> Parsers</a></li><li class="chapter-item expanded "><a href="peekers.html"><strong aria-hidden="true">2.3.</strong> Peekers</a></li></ol></li><li class="chapter-item expanded "><a href="basic.html"><strong aria-hidden="true">3.</strong> Basic Parsers</a></li><li class="chapter-item expanded "><a href="derive.html"><strong aria-hidden="true">4.</strong> Derive Parse</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="type-attr.html"><strong aria-hidden="true">4.1.</strong> Type Attributes</a></li><li class="chapter-item expanded "><a href="field-attr.html"><strong aria-hidden="true">4.2.</strong> Field Attributes</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="nommy.html"><strong aria-hidden="true">1.</strong> nommy</a></li><li class="chapter-item expanded "><a href="ideology.html"><strong aria-hidden="true">2.</strong> Ideology</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="buffers.html"><strong aria-hidden="true">2.1.</strong> Buffers</a></li><li class="chapter-item expanded "><a href="parsers.html"><strong aria-hidden="true">2.2.</strong> Parsers</a></li><li class="chapter-item expanded "><a href="peekers.html"><strong aria-hidden="true">2.3.</strong> Peekers</a></li></ol></li><li class="chapter-item expanded "><a href="basic.html"><strong aria-hidden="true">3.</strong> Basic Parsers</a></li><li class="chapter-item expanded "><a href="derive.html"><strong aria-hidden="true">4.</strong> Derive Parse</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="struct.html"><strong aria-hidden="true">4.1.</strong> Struct</a></li><li class="chapter-item expanded "><a href="enum.html"><strong aria-hidden="true">4.2.</strong> Enum</a></li><li class="chapter-item expanded "><a href="configuration.html"><strong aria-hidden="true">4.3.</strong> Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="type-attr.html"><strong aria-hidden="true">4.3.1.</strong> Type Attributes</a></li><li class="chapter-item expanded "><a href="field-attr.html"><strong aria-hidden="true">4.3.2.</strong> Field Attributes</a></li></ol></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -505,79 +505,175 @@ assert!(FooBar::peek(&amp;mut buffer));
 assert!(buffer.next().is_none());
 <span class="boring">}
 </span></code></pre></pre>
-<h2><a class="header" href="#options" id="options">Options</a></h2>
-<p>The following sections will cover the derive macro in more detail, but before then, let's cover the structure of how to configure the macro.</p>
-<p>The <a href="https://docs.rs/nommy/latest/nommy/derive.Parse.html"><code>derive(Parse)</code></a> macro makes use of the <code>nommy</code> attribute to configure how the <a href="https://docs.rs/nommy/latest/nommy/trait.Parse.html"><code>Parse</code></a> implementation is created. There are two different types of attribute. <code>type attributes</code> and <code>field attributes</code>.</p>
-<p>Refer to the examples below to understand the difference</p>
+<h1><a class="header" href="#struct" id="struct">Struct</a></h1>
+<p>There are 3 different types of <code>struct</code> in rust, all of them are supported by <a href="https://docs.rs/nommy/latest/nommy/derive.Parse.html"><code>derive(Parse)</code></a> in a very similar way</p>
+<h2><a class="header" href="#named-struct" id="named-struct">Named Struct</a></h2>
+<p>This is the standard <code>struct</code> that people think about,</p>
 <pre><pre class="playground"><code class="language-rust edition2018">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span><span class="boring">use nommy::{Parse, text::Tag};
+</span><span class="boring">use nommy::{Parse};
+</span>#[derive(Parse)]
+pub struct FooBar {
+    foo: Tag&lt;&quot;foo&quot;&gt;,
+    bar: Tag&lt;&quot;bar&quot;&gt;,
+}
+<span class="boring">}
+</span></code></pre></pre>
+<p>This will parse the text <code>&quot;foo&quot;</code>, then the text <code>&quot;bar&quot;</code>. Order matters. If any single field returns an error when parsing, then the struct returns an error too.</p>
+<h2><a class="header" href="#unnamedtuple-struct" id="unnamedtuple-struct">Unnamed/Tuple Struct</a></h2>
+<p>Rust also provides <code>unnamed struct</code>s that are essentially the same, but have unnamed fields</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">use nommy::{Parse};
+</span>#[derive(Parse)]
+pub struct FooBar (
+    Tag&lt;&quot;foo&quot;&gt;,
+    Tag&lt;&quot;bar&quot;&gt;,
+);
+<span class="boring">}
+</span></code></pre></pre>
+<p>This parses exactly the same as the named variety</p>
+<h2><a class="header" href="#unit-struct" id="unit-struct">Unit Struct</a></h2>
+<p>Lastly, rust provides unit structs. While these may seem useless in parsing, they do have uses when you configure how the macro should implement <a href="https://docs.rs/nommy/latest/nommy/trait.Parse.html"><code>Parse</code></a>.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">use nommy::{Parse};
+</span>#[derive(Parse)]
+pub struct Unit;
+<span class="boring">}
+</span></code></pre></pre>
+<p>This currently parses nothing, the <a href="configuration.html">configuration</a> section lets you expand the functionality.</p>
+<h1><a class="header" href="#enum" id="enum">Enum</a></h1>
+<p>An <code>enum</code>s parser attempts to parse each <code>variant</code>. The first <code>variant</code> that succeeds to parse is the <code>variant</code> that is returned. If no <code>variant</code> could be parsed,
+the parser returns an error</p>
+<h2><a class="header" href="#example-2" id="example-2">Example</a></h2>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">use nommy::{Parse};
+</span>#[derive(Parse)]
+pub enum FooOrBar {
+    Foo(Tag&lt;&quot;foo&quot;&gt;),
+    Bar(Tag&lt;&quot;bar&quot;&gt;),
+}
+<span class="boring">}
+</span></code></pre></pre>
+<p>This can either parse <code>&quot;foo&quot;</code> or <code>&quot;bar&quot;</code>, but not both.</p>
+<h2><a class="header" href="#first-come-first-serve" id="first-come-first-serve">First come first serve</a></h2>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">use nommy::{Parse};
+</span>#[derive(Parse)]
+pub enum OnlyFoo {
+    Foo(Tag&lt;&quot;foo&quot;&gt;),
+    Foob(Tag&lt;&quot;foob&quot;&gt;),
+}
+<span class="boring">}
+</span></code></pre></pre>
+<p>In this example, the <code>OnlyFoo</code> enum can never parse into a variant of <code>Foob</code>. To see why, let's put in the input <code>&quot;foob&quot;</code>.</p>
+<p>Since <code>enum</code> parsers try to parse each variant in order, it will first try to parse the <code>Foo</code> variant. This will match the input <code>&quot;foo&quot;</code>, and that is indeed found in the input sequence, therefore the result is <code>OnlyFoo::Foo</code> and the input sequence will have <code>'b'</code> remaining.</p>
+<p>One way to solve this is to swap the order, however that might not always be possible. It might be possible to configure greedy evaluation in the future, however that is currently not possible.</p>
+<h2><a class="header" href="#variant-types" id="variant-types">Variant types</a></h2>
+<p>There are 3 types of variant in a rust <code>enum</code>. These are analagous to the <a href="struct.html"><code>struct</code></a>s described in the previous chapter.</p>
+<pre><pre class="playground"><code class="language-rust edition2018">
+<span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span><span class="boring">use nommy::{Parse};
+</span>#[derive(Parse)]
+pub enum ExampleEnum {
+    NamedVariant{
+        foo: Tag&lt;&quot;foo&quot;&gt;,
+        bar: Tag&lt;&quot;bar&quot;&gt;,
+    },
+
+    UnnamedVariant(
+        Tag&lt;&quot;foo&quot;&gt;,
+        Tag&lt;&quot;bar&quot;&gt;,
+    ),
+
+    UnitVariant,
+}
+<span class="boring">}
+</span></code></pre></pre>
+<h1><a class="header" href="#configuration" id="configuration">Configuration</a></h1>
+<p>The <a href="https://docs.rs/nommy/latest/nommy/derive.Parse.html"><code>derive(Parse)</code></a> macro makes use of the <code>nommy</code> attribute to configure how the <a href="https://docs.rs/nommy/latest/nommy/trait.Parse.html"><code>Parse</code></a> implementation is created. There are two different types of attribute. <code>type attributes</code> and <code>field attributes</code>.</p>
+<p>If the attribute is on a <code>struct</code>, <code>enum</code> or an <code>enum variant</code> definition, then it will be a <code>type attribute</code>.
+Otherwise, if the attribute is on a field definition, it will be a <code>field attribute</code>.</p>
+<p>You can repeat many attribute blocks, or repeat attribute rules within the same attribute block, eg:</p>
+<pre><code class="language-rust ignore">#[nommy(prefix = Tag&lt;&quot;(&quot;&gt;, suffix = Tag&lt;&quot;)&quot;&gt;)]
+
+// is the same as
+
+#[nommy(prefix = Tag&lt;&quot;(&quot;&gt;)]
+#[nommy(suffix = Tag&lt;&quot;)&quot;&gt;)]
+</code></pre>
+<h2><a class="header" href="#example-3" id="example-3">Example</a></h2>
+<p>This code example indicates which attributes are understood as <code>type attributes</code>, and which are <code>field attributes</code></p>
+<pre><code class="language-rust ignore"><span class="boring">use nommy::{Parse, text::Tag};
 </span>
 /// Named struct FooBar
 #[derive(Parse)]
-#[nommy(&quot;i am a type attribute&quot;)]
-#[nommy(&quot;i am another type attribute&quot;)]
+#[nommy(&quot;TYPE&quot;, &quot;TYPE&quot;)]
 pub struct FooBar {
-    #[nommy(&quot;i am a field attribute&quot;)]
+    #[nommy(&quot;FIELD&quot;)]
     foo: Tag&lt;&quot;foo&quot;&gt;,
 
-    #[nommy(&quot;i am also a field attribute&quot;)]
-    #[nommy(&quot;i am another field attribute&quot;)]
+    #[nommy(&quot;FIELD&quot;)]
+    #[nommy(&quot;FIELD&quot;)]
     bar: Tag&lt;&quot;bar&quot;&gt;,
 }
 
 /// Tuple struct Baz123
 #[derive(Parse)]
-#[nommy(&quot;i am a type attribute&quot;)]
-#[nommy(&quot;i am another type attribute&quot;)]
+#[nommy(&quot;TYPE&quot;)]
+#[nommy(&quot;TYPE&quot;)]
 pub struct Baz123 (
-    #[nommy(&quot;i am a field attribute&quot;)]
+    #[nommy(&quot;FIELD&quot;, &quot;FIELD&quot;)]
     Tag&lt;&quot;baz&quot;&gt;,
 
-    #[nommy(&quot;i am also a field attribute&quot;)]
-    #[nommy(&quot;i am another field attribute&quot;)]
+    #[nommy(&quot;FIELD&quot;)]
+    #[nommy(&quot;FIELD&quot;)]
     Tag&lt;&quot;123&quot;&gt;,
 );
 
 /// Enum struct FooBarBaz123
 #[derive(Parse)]
-#[nommy(&quot;i am a type attribute&quot;)]
-#[nommy(&quot;i am another type attribute&quot;)]
+#[nommy(&quot;TYPE&quot;)]
+#[nommy(&quot;TYPE&quot;)]
 pub struct FooBarBaz123 (
-    /// named variants are supported
-    #[nommy(&quot;for now, variants also are type attributes&quot;)]
+    #[nommy(&quot;TYPE&quot;)]
     FooBar{
-        #[nommy(&quot;i am a field attribute&quot;)]
+        #[nommy(&quot;FIELD&quot;)]
         foo: Tag&lt;&quot;foo&quot;&gt;,
 
-        #[nommy(&quot;i am also a field attribute&quot;)]
-        #[nommy(&quot;i am another field attribute&quot;)]
+        #[nommy(&quot;FIELD&quot;)]
+        #[nommy(&quot;FIELD&quot;)]
         bar: Tag&lt;&quot;bar&quot;&gt;,
     },
 
-    /// tuple variants are supported
-    #[nommy(&quot;for now, variants also are type attributes&quot;)]
+    #[nommy(&quot;TYPE&quot;)]
     Baz123(
-        #[nommy(&quot;i am a field attribute&quot;)]
+        #[nommy(&quot;FIELD&quot;)]
         Tag&lt;&quot;baz&quot;&gt;,
 
-        #[nommy(&quot;i am also a field attribute&quot;)]
-        #[nommy(&quot;i am another field attribute&quot;)]
+        #[nommy(&quot;FIELD&quot;)]
+        #[nommy(&quot;FIELD&quot;)]
         Tag&lt;&quot;123&quot;&gt;,
     ),
 
-    /// unit variants are also supported
-    #[nommy(&quot;for now, variants also are type attributes&quot;)]
+    #[nommy(&quot;TYPE&quot;)]
     None,
 );
-<span class="boring">}
-</span></code></pre></pre>
+</code></pre>
 <h1><a class="header" href="#type-attributes" id="type-attributes">Type Attributes</a></h1>
 <p>There's currently only 3 supported type attributes</p>
 <h2><a class="header" href="#ignore" id="ignore">Ignore</a></h2>
 <p><code>ignore</code> lets you specify how to parse the tokens that you don't care about.</p>
-<p>For example, ignoreing whitespace:</p>
+<p>For example, ignoring whitespace:</p>
 <pre><pre class="playground"><code class="language-rust edition2018">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {

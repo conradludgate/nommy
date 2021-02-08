@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::{ToTokens, format_ident, quote};
 
 use crate::attr::{FieldAttr, VecFieldAttr};
 
@@ -272,12 +272,16 @@ pub fn ignore_impl(
     let mut ignore_impl = TokenStream::new();
     let mut ignore_wc = TokenStream::new();
     for ty in ignore {
+        let ty_string = ty.to_token_stream().to_string();
         wc.extend(peek_where_tokens(&ty, &generic));
         ignore_wc.extend(peek_where_tokens(&ty, &generic));
         ignore_impl.extend(quote! {
             {
                 let mut cursor = input.cursor();
                 if <#ty as ::nommy::Parse<#generic>>::peek(&mut cursor) {
+                    if ::std::cfg!(debug_assertions) && cursor.position() == 0 {
+                        panic!(format!("ignore type `{}` passed but read 0 elements. Please ensure it reads at least 1 element otherwise it will cause an infinite loop", #ty_string));
+                    }
                     cursor.fast_forward_parent();
                     return true
                 }

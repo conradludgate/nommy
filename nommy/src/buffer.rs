@@ -154,7 +154,26 @@ impl<'a, T, B: Buffer<T>> Cursor<'a, T, B> {
     /// assert_eq!(input.next(), Some('r'));
     /// ```
     pub fn fast_forward_parent(self) {
+        if cfg!(debug_assertions) && self.index == 0 {
+            panic!("attempting to fast forward parent, but cursor has not be read from");
+        }
         self.buf.fast_forward(self.index)
+    }
+
+    /// Returns how far along the cursor has read beyond it's parent
+    ///
+    /// ```
+    /// use nommy::{Buffer, IntoBuf};
+    /// let mut input = "foobar".chars().into_buf();
+    /// let mut cursor = input.cursor();
+    /// assert_eq!(cursor.next(), Some('f'));
+    /// assert_eq!(cursor.next(), Some('o'));
+    /// assert_eq!(cursor.next(), Some('o'));
+    ///
+    /// assert_eq!(cursor.position(), 3);
+    /// ```
+    pub fn position(&self) -> usize {
+        self.index
     }
 }
 

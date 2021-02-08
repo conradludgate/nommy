@@ -9,6 +9,9 @@ impl<P: Parse<T>, T> Parse<T> for Option<P> {
         let mut cursor = input.cursor();
         match P::parse(&mut cursor) {
             Ok(p) => {
+                if cfg!(debug_assertions) && cursor.position() == 0 {
+                    panic!("parsing succeeded with 0 elements read - fix: remove `Option<_>`");
+                }
                 cursor.fast_forward_parent();
                 Ok(Some(p))
             }
@@ -20,6 +23,9 @@ impl<P: Parse<T>, T> Parse<T> for Option<P> {
         let mut cursor = input.cursor();
 
         if P::peek(&mut cursor) {
+            if cfg!(debug_assertions) && cursor.position() == 0 {
+                panic!("parsing succeeded with 0 elements read - fix: remove `Option<_>`");
+            }
             cursor.fast_forward_parent()
         }
 
@@ -30,6 +36,15 @@ impl<P: Parse<T>, T> Parse<T> for Option<P> {
 
 /// Repeatedly attempts to parse `P`, Result is all successful attempts
 impl<P: Parse<T>, T> Parse<T> for Vec<P> {
+    /// # Panics
+    /// If `P` is able to parse 0 tokens successfully, it would result in an infinite loop.
+    /// In debug builds, we detect this and panic
+    ///
+    /// ```should_panic
+    /// use nommy::{IntoBuf, Parse, text::Tag};
+    /// let mut input = "...".chars().into_buf();
+    /// Vec::<Option<Tag<".">>>::parse(&mut input);
+    /// ```
     fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self> {
         let mut output = Self::new();
         loop {
@@ -37,6 +52,9 @@ impl<P: Parse<T>, T> Parse<T> for Vec<P> {
             match P::parse(&mut cursor) {
                 Ok(p) => output.push(p),
                 Err(_) => break,
+            }
+            if cfg!(debug_assertions) && cursor.position() == 0 {
+                panic!("parsing succeeded with 0 elements read. infinite loop detected");
             }
             cursor.fast_forward_parent();
         }
@@ -50,7 +68,10 @@ impl<P: Parse<T>, T> Parse<T> for Vec<P> {
             if !P::peek(&mut cursor) {
                 break;
             }
-            cursor.fast_forward_parent()
+            if cfg!(debug_assertions) && cursor.position() == 0 {
+                panic!("parsing succeeded with 0 elements read. infinite loop detected");
+            }
+            cursor.fast_forward_parent();
         }
         true
     }
@@ -89,6 +110,9 @@ impl<P: Parse<T>, T> Parse<T> for Vec1<P> {
                 Ok(p) => output.push(p),
                 Err(_) => break,
             }
+            if cfg!(debug_assertions) && cursor.position() == 0 {
+                panic!("parsing succeeded with 0 elements read. infinite loop detected");
+            }
             cursor.fast_forward_parent();
         }
 
@@ -104,6 +128,9 @@ impl<P: Parse<T>, T> Parse<T> for Vec1<P> {
             let mut cursor = input.cursor();
             if !P::peek(&mut cursor) {
                 break;
+            }
+            if cfg!(debug_assertions) && cursor.position() == 0 {
+                panic!("parsing succeeded with 0 elements read. infinite loop detected");
             }
             cursor.fast_forward_parent()
         }

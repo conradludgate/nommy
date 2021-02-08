@@ -3,7 +3,7 @@ authors = ["Conrad Ludgate"]
 language = "en"
 multilingual = false
 src = "src"
-title = "Type Based parsing with Nommy"
+title = "The little book of nommy"
 
 [rust]
 edition = "2018"

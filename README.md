@@ -1,5 +1,9 @@
 # nommy
-A type based parsing library with convenient macros
+
+[![nommy crate](https://img.shields.io/crates/v/nommy?style=flat-square)](https://crates.io/crates/nommy)
+[![nommy docs](https://img.shields.io/docsrs/nommy?style=flat-square)](https://docs.rs/nommy/latest/nommy/)
+
+A type based parsing library with convenient macros. See [the book](https://conradludgate.github.io/nommy/) for a guide into making parsers with nommy
 
 ```rust
 use nommy::{parse, text::*, Parse};

@@ -28,12 +28,6 @@ impl FnImpl<NamedField> for Unit {
     fn attrs(&self) -> &GlobalAttr {
         &self.attrs
     }
-    fn result(&self) -> TokenStream {
-        let name = &self.name;
-        quote! {
-            Ok(#name)
-        }
-    }
 }
 
 impl Unit {
@@ -63,26 +57,25 @@ impl ToTokens for Unit {
             attrs: _,
             generic,
         } = self;
+
         let BuildOutput {
-            fn_impl: parse_fn_impl,
-            wc: parse_wc,
-        } = self.build_parse();
-        let BuildOutput {
-            fn_impl: peek_fn_impl,
-            wc: peek_wc,
-        } = self.build_peek();
+            peek_impl,
+            parse_impl,
+            wc,
+        } = self.build();
 
         tokens.extend(quote!{
             #[automatically_derived]
             impl<#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
-            where #parse_wc #peek_wc {
+            where #wc {
                 fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
                     use ::nommy::eyre::WrapErr;
-                    #parse_fn_impl
+                    #parse_impl
+                    Ok(#name)
                 }
 
                 fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
-                    #peek_fn_impl
+                    #peek_impl
                     true
                 }
             }

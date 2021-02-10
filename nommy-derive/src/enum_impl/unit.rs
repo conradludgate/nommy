@@ -1,7 +1,7 @@
+use super::Enum;
+use crate::{attr::GlobalAttr, fn_impl::FnImpl, parsers::NamedField};
 use proc_macro2::TokenStream;
 use quote::quote;
-use crate::{attr::GlobalAttr, fn_impl::FnImpl, parsers::NamedField};
-use super::Enum;
 
 pub struct EnumVariantUnit {
     pub name: syn::Ident,
@@ -13,13 +13,6 @@ impl FnImpl<NamedField> for (&EnumVariantUnit, &Enum) {
     fn fields(&self) -> &[NamedField] {
         &[]
     }
-    fn result(&self) -> TokenStream {
-        let enum_name = &self.1.name;
-        let variant_name = &self.0.name;
-        quote! {
-            Ok(#enum_name::#variant_name)
-        }
-    }
     fn name(&self) -> &syn::Ident {
         &self.0.name
     }
@@ -28,5 +21,15 @@ impl FnImpl<NamedField> for (&EnumVariantUnit, &Enum) {
     }
     fn attrs(&self) -> &GlobalAttr {
         &self.0.attrs
+    }
+}
+
+impl EnumVariantUnit {
+    pub fn result(&self, enum_: &Enum) -> TokenStream {
+        let enum_name = &enum_.name;
+        let variant_name = &self.name;
+        quote! {
+            Ok(#enum_name::#variant_name)
+        }
     }
 }

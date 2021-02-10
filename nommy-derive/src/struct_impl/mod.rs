@@ -3,5 +3,5 @@ mod unit;
 mod unnamed;
 
 pub use named::Named;
-pub use unnamed::Unnamed;
 pub use unit::Unit;
+pub use unnamed::Unnamed;

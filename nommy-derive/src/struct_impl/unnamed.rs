@@ -31,15 +31,6 @@ impl FnImpl<UnnamedField> for Unnamed {
     fn attrs(&self) -> &GlobalAttr {
         &self.attrs
     }
-    fn result(&self) -> TokenStream {
-        let names = self.fields.iter().enumerate().map(|(i, f)| f.name(i));
-        let name = &self.name;
-        quote! {
-            Ok(#name (#(
-                #names,
-            )*))
-        }
-    }
 }
 
 impl Unnamed {
@@ -50,7 +41,11 @@ impl Unnamed {
         fields: syn::FieldsUnnamed,
     ) -> syn::Result<Self> {
         let args = generics.type_params().cloned().map(|tp| tp.ident).collect();
-        let fields  = fields.unnamed.into_iter().map(|f| f.try_into()).collect::<syn::Result<_>>()?;
+        let fields = fields
+            .unnamed
+            .into_iter()
+            .map(|f| f.try_into())
+            .collect::<syn::Result<_>>()?;
         let attrs = GlobalAttr::parse_attrs(attrs)?;
         let generic = parse_or(&attrs.parse_type);
 
@@ -72,26 +67,30 @@ impl ToTokens for Unnamed {
             generic,
             ..
         } = self;
+
         let BuildOutput {
-            fn_impl: parse_fn_impl,
-            wc: parse_wc,
-        } = self.build_parse();
-        let BuildOutput {
-            fn_impl: peek_fn_impl,
-            wc: peek_wc,
-        } = self.build_peek();
+            peek_impl,
+            parse_impl,
+            wc,
+        } = self.build();
+
+        let names = self.fields.iter().enumerate().map(|(i, f)| f.name(i));
 
         tokens.extend(quote!{
             #[automatically_derived]
             impl<#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
-            where #parse_wc #peek_wc {
+            where #wc {
                 fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
                     use ::nommy::eyre::WrapErr;
-                    #parse_fn_impl
+                    #parse_impl
+
+                    Ok(#name (#(
+                        #names,
+                    )*))
                 }
 
                 fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
-                    #peek_fn_impl
+                    #peek_impl
                     true
                 }
             }

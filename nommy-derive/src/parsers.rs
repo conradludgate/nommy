@@ -70,139 +70,7 @@ impl FieldType for UnnamedField {
     }
 }
 
-pub struct FunctionBuilder<'a> {
-    pub wc: &'a mut TokenStream,
-    pub generic: &'a syn::Type,
-    pub type_name: &'a syn::Ident,
-    after_each: TokenStream,
-}
-
-impl<'a> FunctionBuilder<'a> {
-    pub fn new(
-        wc: &'a mut TokenStream,
-        generic: &'a syn::Type,
-        type_name: &'a syn::Ident,
-        after_each: TokenStream,
-    ) -> Self {
-        FunctionBuilder {
-            wc,
-            generic,
-            type_name,
-            after_each,
-        }
-    }
-
-    fn add_where(&mut self, ty: &syn::Type) {
-        self.wc
-            .extend(where_tokens(&self.type_name, &ty, &self.generic));
-    }
-
-    // prefix or suffix
-    pub fn parse_fix(
-        &mut self,
-        fix: &Option<syn::Type>,
-        fix_type: &'static str,
-        type_name: &str,
-    ) -> TokenStream {
-        match fix {
-            Some(fix) => {
-                self.add_where(&fix);
-                let mut tokens = parser_peek_tokens(
-                    &fix,
-                    &self.generic,
-                    &format!("failed to parse {} for {}", fix_type, type_name),
-                );
-                tokens.extend(self.after_each.clone());
-                tokens
-            }
-            None => Default::default(),
-        }
-    }
-
-    // prefix or suffix
-    pub fn peek_fix(&mut self, fix: &Option<syn::Type>) -> TokenStream {
-        match fix {
-            Some(fix) => {
-                self.add_where(&fix);
-                let mut tokens = peeker_peek_tokens(&fix, &self.generic);
-                tokens.extend(self.after_each.clone());
-                tokens
-            }
-            None => Default::default(),
-        }
-    }
-
-    pub fn parse_field<F: FieldType>(&mut self, field: &F, field_num: usize) -> TokenStream {
-        let ty = field.ty();
-        let name = field.name(field_num);
-        let attrs = field.attrs();
-
-        let mut tokens = TokenStream::new();
-
-        tokens.extend(self.parse_fix(&attrs.prefix, "prefix", &format!("field `{}`", name)));
-
-        if attrs.vec.is_some() {
-            let parser: Option<&syn::Type> = (&attrs.vec.parser).into();
-            let parser = parser.unwrap();
-            self.add_where(&parser);
-            tokens.extend(parser_parse_vec_tokens(
-                &name,
-                &attrs.vec,
-                &self.generic,
-                &self.after_each,
-            ));
-        } else {
-            let parser: Option<&syn::Type> = (&attrs.parser).into();
-            let parser = parser.unwrap_or(&ty);
-            self.add_where(&parser);
-            tokens.extend(parser_parse_tokens(
-                &name,
-                &parser,
-                &self.generic,
-                &format!("failed to parse field `{}`", name),
-            ));
-        }
-
-        tokens.extend(self.after_each.clone());
-
-        tokens.extend(self.parse_fix(&attrs.suffix, "suffix", &format!("field `{}`", name)));
-
-        tokens
-    }
-
-    pub fn peek_field<F: FieldType>(&mut self, field: &F, _field_num: usize) -> TokenStream {
-        let ty = field.ty();
-        let attrs = field.attrs();
-
-        let mut tokens = TokenStream::new();
-
-        tokens.extend(self.peek_fix(&attrs.prefix));
-
-        if attrs.vec.is_some() {
-            let parser: Option<&syn::Type> = (&attrs.vec.parser).into();
-            let parser = parser.unwrap();
-            self.add_where(&parser);
-            tokens.extend(peeker_peek_vec_tokens(
-                &parser,
-                &self.generic,
-                &self.after_each,
-            ));
-        } else {
-            let parser: Option<&syn::Type> = (&attrs.parser).into();
-            let parser = parser.unwrap_or(&ty);
-            self.add_where(&parser);
-            tokens.extend(peeker_peek_tokens(&parser, &self.generic));
-        }
-
-        tokens.extend(self.after_each.clone());
-
-        tokens.extend(self.peek_fix(&attrs.suffix));
-
-        tokens
-    }
-}
-
-fn where_tokens(type_name: &syn::Ident, ty: &syn::Type, generic: &syn::Type) -> TokenStream {
+pub fn where_tokens(type_name: &syn::Ident, ty: &syn::Type, generic: &syn::Type) -> TokenStream {
     if crate::ty::contains(&ty, &type_name) {
         quote! {}
     } else {
@@ -211,7 +79,7 @@ fn where_tokens(type_name: &syn::Ident, ty: &syn::Type, generic: &syn::Type) -> 
 }
 
 /// section of a parser impl
-fn parser_parse_tokens(
+pub fn parser_parse_tokens(
     name: &syn::Ident,
     ty: &syn::Type,
     generic: &syn::Type,
@@ -222,13 +90,13 @@ fn parser_parse_tokens(
     }
 }
 /// section of a parser impl
-fn parser_peek_tokens(ty: &syn::Type, generic: &syn::Type, error: &str) -> TokenStream {
+pub fn parser_peek_tokens(ty: &syn::Type, generic: &syn::Type, error: &str) -> TokenStream {
     quote! {
         if !(<#ty as ::nommy::Parse<#generic>>::peek(input)) { return Err(::nommy::eyre::eyre!(#error)) }
     }
 }
 /// section of a parser impl
-fn parser_parse_vec_tokens(
+pub fn parser_parse_vec_tokens(
     name: &syn::Ident,
     attrs: &VecFieldAttr,
     generic: &syn::Type,
@@ -252,13 +120,13 @@ fn parser_parse_vec_tokens(
     }
 }
 /// section of a peeker impl
-fn peeker_peek_tokens(ty: &syn::Type, generic: &syn::Type) -> TokenStream {
+pub fn peeker_peek_tokens(ty: &syn::Type, generic: &syn::Type) -> TokenStream {
     quote! {
         if !(<#ty as ::nommy::Parse<#generic>>::peek(input)) { return false }
     }
 }
 /// section of a peeker impl
-fn _peeker_parse_tokens(name: &syn::Ident, ty: &syn::Type, generic: &syn::Type) -> TokenStream {
+pub fn _peeker_parse_tokens(name: &syn::Ident, ty: &syn::Type, generic: &syn::Type) -> TokenStream {
     quote! {
         let #name = match <#ty as ::nommy::Parse<#generic>>::parse(input) {
             Ok(v) => v,
@@ -267,7 +135,7 @@ fn _peeker_parse_tokens(name: &syn::Ident, ty: &syn::Type, generic: &syn::Type) 
     }
 }
 /// section of a peeker impl
-fn peeker_peek_vec_tokens(
+pub fn peeker_peek_vec_tokens(
     ty: &syn::Type,
     generic: &syn::Type,
     after_each: &TokenStream,

@@ -18,16 +18,6 @@ impl FnImpl<UnnamedField> for (&EnumVariantUnnamed, &Enum) {
     fn fields(&self) -> &[UnnamedField] {
         &self.0.fields
     }
-    fn result(&self) -> TokenStream {
-        let names = self.0.fields.iter().enumerate().map(|(i, f)| f.name(i));
-        let enum_name = &self.1.name;
-        let variant_name = &self.0.name;
-        quote! {
-            Ok(#enum_name::#variant_name (#(
-                #names,
-            )*))
-        }
-    }
     fn name(&self) -> &syn::Ident {
         &self.0.name
     }
@@ -36,5 +26,18 @@ impl FnImpl<UnnamedField> for (&EnumVariantUnnamed, &Enum) {
     }
     fn attrs(&self) -> &GlobalAttr {
         &self.0.attrs
+    }
+}
+
+impl EnumVariantUnnamed {
+    pub fn result(&self, enum_: &Enum) -> TokenStream {
+        let names = self.fields.iter().enumerate().map(|(i, f)| f.name(i));
+        let enum_name = &enum_.name;
+        let variant_name = &self.name;
+        quote! {
+            Ok(#enum_name::#variant_name (#(
+                #names,
+            )*))
+        }
     }
 }

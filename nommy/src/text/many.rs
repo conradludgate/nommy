@@ -29,7 +29,8 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf<CHARS> {
                 Ok(c) => output.push(c.into()),
                 Err(_) => break,
             }
-            cursor.fast_forward_parent();
+            let pos = cursor.position();
+            input.fast_forward(pos);
         }
 
         Ok(Self(output))
@@ -41,7 +42,8 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf<CHARS> {
             if !OneOf::<CHARS>::peek(&mut cursor) {
                 break;
             }
-            cursor.fast_forward_parent()
+            let pos = cursor.position();
+            input.fast_forward(pos);
         }
         true
     }
@@ -91,7 +93,8 @@ impl<const CHARS: &'static str> Parse<char> for WhileNot1<CHARS> {
             if OneOf::<CHARS>::peek(&mut cursor) {
                 break;
             }
-            cursor.fast_forward_parent()
+            let pos = cursor.position();
+            input.fast_forward(pos);
         }
         true
     }
@@ -124,7 +127,8 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf1<CHARS> {
                 Ok(c) => output.push(c.into()),
                 Err(_) => break,
             }
-            cursor.fast_forward_parent();
+            let pos = cursor.position();
+            input.fast_forward(pos);
         }
 
         if output.is_empty() {
@@ -143,7 +147,8 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf1<CHARS> {
             if !OneOf::<CHARS>::peek(&mut cursor) {
                 break;
             }
-            cursor.fast_forward_parent()
+            let pos = cursor.position();
+            input.fast_forward(pos);
         }
         true
     }

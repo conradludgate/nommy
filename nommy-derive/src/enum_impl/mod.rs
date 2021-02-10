@@ -82,15 +82,15 @@ impl ToTokens for Enum {
                 });
 
         let mut ignore_wc = TokenStream::new();
-        let (ignore, after_each) = ignore_impl(&mut ignore_wc, &attrs.ignore, generic);
+        let (ignore, after_each) = ignore_impl(&mut ignore_wc, &attrs.ignore, generic, name);
         parse_wc.extend(ignore_wc.clone());
         peek_wc.extend(ignore_wc);
 
-        let mut parse_builder = FunctionBuilder::new(&mut parse_wc, generic, after_each.clone());
+        let mut parse_builder = FunctionBuilder::new(&mut parse_wc, generic, name, after_each.clone());
         let parse_prefix = parse_builder.parse_fix(&attrs.prefix, "prefix", &name.to_string());
         let parse_suffix = parse_builder.parse_fix(&attrs.suffix, "suffix", &name.to_string());
 
-        let mut peek_builder = FunctionBuilder::new(&mut peek_wc, generic, after_each);
+        let mut peek_builder = FunctionBuilder::new(&mut peek_wc, generic, name, after_each);
         let peek_prefix = peek_builder.peek_fix(&attrs.prefix);
         let peek_suffix = peek_builder.peek_fix(&attrs.suffix);
 

@@ -7,6 +7,7 @@ mod enum_impl;
 mod fn_impl;
 mod parsers;
 mod struct_impl;
+mod ty;
 
 #[proc_macro_derive(Parse, attributes(nommy))]
 pub fn derive_parse(input: TokenStream) -> TokenStream {

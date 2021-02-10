@@ -10,7 +10,7 @@ enum JSON {
     Null,
 
     #[nommy(prefix = Tag<"{">, suffix = Tag<"}">)]
-    Object(Vec<Record>),
+    Object(Vec<Record<JSON>>),
 
     #[nommy(prefix = Tag<"[">, suffix = Tag<"]">)]
     List(#[nommy(inner_parser = JSON)] Vec<JSON>),
@@ -21,12 +21,12 @@ enum JSON {
 
 #[derive(Debug, PartialEq, Parse)]
 #[nommy(ignore = WhiteSpace)]
-struct Record {
+struct Record<T> {
     #[nommy(parser = StringParser)]
     #[nommy(suffix = Tag<":">)]
     name: String,
 
-    value: JSON,
+    value: T,
 }
 
 struct StringParser(String);
@@ -90,17 +90,17 @@ impl Into<String> for StringParser {
 }
 
 fn main() {
-    // let fake_json = r#"
-    //     {
-    //         "foo": "bar",
-    //         "baz": {
-    //             "hello": [
-    //                 "world",
-    //             ],
-    //         },
-    //     },
-    // "#;
+    let fake_json = r#"
+        {
+            "foo": "bar",
+            "baz": {
+                "hello": [
+                    "world",
+                ],
+            },
+        },
+    "#;
 
-    // let json: JSON = parse(fake_json.chars()).unwrap();
-    // println!("{:?}", json);
+    let json: JSON = parse(fake_json.chars()).unwrap();
+    println!("{:?}", json);
 }

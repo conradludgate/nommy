@@ -24,9 +24,9 @@ pub trait FnImpl<F: FieldType>: Sized {
         let name = self.name();
         let attrs = self.attrs();
 
-        let (ignore, after_each) = ignore_impl(&mut wc, &attrs.ignore, self.generic());
+        let (ignore, after_each) = ignore_impl(&mut wc, &attrs.ignore, self.generic(), self.name());
 
-        let mut builder = FunctionBuilder::new(&mut wc, self.generic(), after_each);
+        let mut builder = FunctionBuilder::new(&mut wc, self.generic(), self.name(), after_each);
 
         let mut tokens = TokenStream::new();
         tokens.extend(ignore);
@@ -59,8 +59,8 @@ pub trait FnImpl<F: FieldType>: Sized {
         let mut wc = TokenStream::new();
         let attrs = self.attrs();
 
-        let (ignore, after_each) = ignore_impl(&mut wc, &attrs.ignore, self.generic());
-        let mut builder = FunctionBuilder::new(&mut wc, self.generic(), after_each);
+        let (ignore, after_each) = ignore_impl(&mut wc, &attrs.ignore, self.generic(), self.name());
+        let mut builder = FunctionBuilder::new(&mut wc, self.generic(), self.name(), after_each);
 
         let mut tokens = TokenStream::new();
         tokens.extend(ignore);

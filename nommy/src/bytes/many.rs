@@ -47,7 +47,8 @@ impl<const BYTES: &'static [u8]> Parse<u8> for AnyOf1<BYTES> {
             if !OneOf::<BYTES>::peek(&mut cursor) {
                 break;
             }
-            cursor.fast_forward_parent()
+            let pos = cursor.position();
+            input.fast_forward(pos);
         }
         true
     }

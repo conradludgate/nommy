@@ -25,12 +25,12 @@ use std::{collections::VecDeque, marker::PhantomData};
 /// assert_eq!(buffer.next(), Some(0));
 /// ```
 pub trait Buffer<T>: Iterator<Item = T> + Sized {
+    /// Base type for cursor
+    type CursorBase: Buffer<T>;
     /// Create a new cursor from this buffer
     /// any reads the cursor makes will not
     /// affect the next values the buffer will read
-    fn cursor(&mut self) -> Cursor<T, Self> {
-        Cursor::new(self)
-    }
+    fn cursor(&mut self) -> Cursor<T, Self::CursorBase>;
 
     /// Skip the iterator ahead by n steps
     fn fast_forward(&mut self, n: usize);
@@ -87,6 +87,11 @@ impl<I: Iterator> Buffer<I::Item> for Buf<I>
 where
     I::Item: Clone,
 {
+    type CursorBase = Self;
+    fn cursor(&mut self) -> Cursor<I::Item, Self::CursorBase> {
+        Cursor::new(self)
+    }
+
     fn fast_forward(&mut self, n: usize) {
         let len = self.buffer.len();
         if len <= n {
@@ -122,43 +127,45 @@ where
 /// See [`Buffer`] documentation for example usage
 pub struct Cursor<'a, T, B: Buffer<T>> {
     buf: &'a mut B,
+    base: usize,
     index: usize,
     _t: PhantomData<T>,
 }
 
 impl<'a, T, B: Buffer<T>> Cursor<'a, T, B> {
     fn new(buf: &'a mut B) -> Self {
-        Cursor {
+        Self {
             buf,
+            base: 0,
             index: 0,
             _t: PhantomData,
         }
     }
 
-    /// Drops this cursor and calls [`Buffer::fast_forward`] on the parent buffer
-    ///
-    /// ```
-    /// use nommy::{Buffer, IntoBuf};
-    /// let mut input = "foobar".chars().into_buf();
-    /// let mut cursor = input.cursor();
-    /// assert_eq!(cursor.next(), Some('f'));
-    /// assert_eq!(cursor.next(), Some('o'));
-    /// assert_eq!(cursor.next(), Some('o'));
-    ///
-    /// // Typically, the next three calls to `next` would repeat
-    /// // the first three calls because cursors read non-destructively.
-    /// // However, this method allows to drop the already-read contents
-    /// cursor.fast_forward_parent();
-    /// assert_eq!(input.next(), Some('b'));
-    /// assert_eq!(input.next(), Some('a'));
-    /// assert_eq!(input.next(), Some('r'));
-    /// ```
-    pub fn fast_forward_parent(self) {
-        if cfg!(debug_assertions) && self.index == 0 {
-            panic!("attempting to fast forward parent, but cursor has not be read from");
-        }
-        self.buf.fast_forward(self.index)
-    }
+    // /// Drops this cursor and calls [`Buffer::fast_forward`] on the parent buffer
+    // ///
+    // /// ```
+    // /// use nommy::{Buffer, IntoBuf};
+    // /// let mut input = "foobar".chars().into_buf();
+    // /// let mut cursor = input.cursor();
+    // /// assert_eq!(cursor.next(), Some('f'));
+    // /// assert_eq!(cursor.next(), Some('o'));
+    // /// assert_eq!(cursor.next(), Some('o'));
+    // ///
+    // /// // Typically, the next three calls to `next` would repeat
+    // /// // the first three calls because cursors read non-destructively.
+    // /// // However, this method allows to drop the already-read contents
+    // /// cursor.fast_forward_parent();
+    // /// assert_eq!(input.next(), Some('b'));
+    // /// assert_eq!(input.next(), Some('a'));
+    // /// assert_eq!(input.next(), Some('r'));
+    // /// ```
+    // pub fn fast_forward_parent(self) {
+    //     if cfg!(debug_assertions) && self.index == 0 {
+    //         panic!("attempting to fast forward parent, but cursor has not be read from");
+    //     }
+    //     self.buf.fast_forward(self.index)
+    // }
 
     /// Returns how far along the cursor has read beyond it's parent
     ///
@@ -167,9 +174,14 @@ impl<'a, T, B: Buffer<T>> Cursor<'a, T, B> {
     /// let mut input = "foobar".chars().into_buf();
     /// let mut cursor = input.cursor();
     /// assert_eq!(cursor.next(), Some('f'));
-    /// assert_eq!(cursor.next(), Some('o'));
-    /// assert_eq!(cursor.next(), Some('o'));
+    /// assert_eq!(cursor.position(), 1);
     ///
+    /// let mut cursor2 = cursor.cursor();
+    /// assert_eq!(cursor2.next(), Some('o'));
+    /// assert_eq!(cursor2.next(), Some('o'));
+    /// assert_eq!(cursor2.position(), 2);
+    ///
+    /// cursor2.fast_forward_parent();
     /// assert_eq!(cursor.position(), 3);
     /// ```
     pub fn position(&self) -> usize {
@@ -183,7 +195,17 @@ impl<'a, T, B: Buffer<T>> Buffer<T> for Cursor<'a, T, B> {
     }
 
     fn peek_ahead(&mut self, i: usize) -> Option<T> {
-        self.buf.peek_ahead(self.index + i)
+        self.buf.peek_ahead(self.base + self.index + i)
+    }
+
+    type CursorBase = B;
+    fn cursor(&mut self) -> Cursor<T, Self::CursorBase> {
+        Cursor {
+            buf: self.buf,
+            base: self.base + self.index,
+            index: 0,
+            _t: PhantomData,
+        }
     }
 }
 
@@ -191,15 +213,137 @@ impl<'a, T, B: Buffer<T>> Iterator for Cursor<'a, T, B> {
     type Item = T;
 
     fn next(&mut self) -> Option<T> {
-        let output = self.buf.peek_ahead(self.index);
+        let output = self.buf.peek_ahead(self.base + self.index);
         self.index += 1;
         output
     }
 }
 
+// use std::io::Read;
+
+// /// Implements [`Buffer`] for types that implement [`Read`]
+// pub struct BufRead<R: Read> {
+//     read: R,
+//     buf: Vec<u8>,
+//     head: usize,
+//     len: usize,
+// }
+
+// impl<R: Read> BufRead<R> {
+//     const DEFAULT_CAPACITY: usize = 4 * 1024;
+//     pub fn new(read: R) -> Self {
+//         Self::with_capacity(read, Self::DEFAULT_CAPACITY)
+//     }
+
+//     pub fn with_capacity(read: R, capacity: usize) -> Self {
+//         let mut buf = Vec::with_capacity(capacity);
+
+//         // Safety: buf makes use of `head` and `len` to determine whether the
+//         // value is initialised.
+//         unsafe {
+//             buf.set_len(capacity);
+//         }
+//         Self {
+//             read,
+//             buf,
+//             head: 0,
+//             len: 0,
+//         }
+//     }
+
+//     pub fn set_capacity(&mut self, capacity: usize) {
+//         let capacity = capacity.max(self.len);
+
+//         let head = self.head;
+//         let len = self.len;
+//         let cc = self.buf.len();
+
+//         if head + len > cc {
+//             // Data is currently fragmented
+//             // solve by creating a new vec with the desired capacity to defrag
+
+//             let mut new_buf = Vec::with_capacity(capacity);
+
+//             // Safety: buf makes use of `head` and `len` to determine whether the
+//             // value is initialised.
+//             unsafe {
+//                 new_buf.set_len(capacity);
+//             }
+
+//             new_buf[..(cc - head)].copy_from_slice(&self.buf[head..]);
+//             new_buf[(cc - head)..(cc - head + len)].copy_from_slice(&self.buf[..len]);
+
+//             self.buf = new_buf;
+//         } else {
+//             self.buf.reserve(capacity - cc);
+//         }
+//     }
+
+//     pub fn fill_buffer(&mut self) -> std::io::Result<()> {
+//         if self.head + self.len < self.buf.len() {
+//             self.len += self.read.read(&mut self.buf[self.head + self.len..])?;
+
+//             if self.len < self.buf.len() {
+//                 // didn't completely fill up
+//                 return Ok(());
+//             }
+//         }
+
+//         let tail = (self.head + self.len) % self.buf.len();
+//         self.len += self.read.read(&mut self.buf[tail..self.head])?;
+//         Ok(())
+//     }
+// }
+
+// impl<R: Read> Iterator for BufRead<R> {
+//     type Item = u8;
+//     fn next(&mut self) -> Option<Self::Item> {
+//         println!("buf: {:?} head: {} len: {}", self.buf, self.head, self.len);
+//         let capacity = self.buf.len();
+
+//         if self.len == 0 {
+//             self.fill_buffer().map_or(None, Some)?;
+
+//             if self.len == 0 {
+//                 // attempted to fill but length still 0, implies that the reader is most likely now empty
+//                 return None;
+//             }
+//         }
+
+//         let byte = self.buf[self.head];
+//         self.head += 1;
+//         self.head %= capacity;
+//         self.len -= 1;
+//         Some(byte)
+//     }
+// }
+
+// impl<R: Read> Buffer<u8> for BufRead<R> {
+//     fn fast_forward(&mut self, n: usize) {
+//         if n > self.len {
+//         } else {
+//             self.head += n;
+//             self.head %= self.buf.len();
+//             self.len -= n;
+//         }
+//     }
+
+//     fn peek_ahead(&mut self, i: usize) -> Option<u8> {
+//         if i > self.buf.len() {
+//             self.set_capacity(i.next_power_of_two());
+//         }
+//         if i > self.len {}
+
+//         let byte = self.buf[self.head];
+//         self.head += 1;
+//         self.head %= self.buf.len();
+//         Some(byte)
+//     }
+// }
+
 #[cfg(test)]
 mod tests {
-    use crate::IntoBuf;
+    use crate::{IntoBuf};
 
     use super::Buffer;
 
@@ -243,4 +387,13 @@ mod tests {
 
         assert!(buffer.buffer.is_empty());
     }
+
+    // #[test]
+    // fn bufread() {
+    //     let read: &[u8] = b"Hello World!";
+    //     let buffer = BufRead::with_capacity(read, 5);
+
+    //     let output: Vec<u8> = buffer.collect();
+    //     assert_eq!(&output, b"Hello World!");
+    // }
 }

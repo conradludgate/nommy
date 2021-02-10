@@ -90,17 +90,17 @@ impl Into<String> for StringParser {
 }
 
 fn main() {
-    let fake_json = r#"
-        {
-            "foo": "bar",
-            "baz": {
-                "hello": [
-                    "world",
-                ],
-            },
-        },
-    "#;
+    // let fake_json = r#"
+    //     {
+    //         "foo": "bar",
+    //         "baz": {
+    //             "hello": [
+    //                 "world",
+    //             ],
+    //         },
+    //     },
+    // "#;
 
-    let json: JSON = parse(fake_json.chars()).unwrap();
-    println!("{:?}", json);
+    // let json: JSON = parse(fake_json.chars()).unwrap();
+    // println!("{:?}", json);
 }

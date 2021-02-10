@@ -17,19 +17,51 @@ pub struct Unnamed {
     generic: syn::Type,
 }
 
-impl FnImpl<UnnamedField> for Unnamed {
-    const TYPE: &'static str = "struct";
-    fn fields(&self) -> &[UnnamedField] {
-        &self.fields
-    }
-    fn name(&self) -> &syn::Ident {
-        &self.name
-    }
-    fn generic(&self) -> &syn::Type {
-        &self.generic
-    }
-    fn attrs(&self) -> &GlobalAttr {
-        &self.attrs
+impl ToTokens for Unnamed {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let Unnamed {
+            name,
+            args,
+            generic,
+            fields,
+            attrs,
+        } = self;
+
+        let fn_impl = FnImpl {
+            ty: "struct",
+            name,
+            fields,
+            attrs,
+            generic,
+        };
+
+        let BuildOutput {
+            peek_impl,
+            parse_impl,
+            wc,
+        } = fn_impl.build();
+
+        let names = self.fields.iter().enumerate().map(|(i, f)| f.name(i));
+
+        tokens.extend(quote!{
+            #[automatically_derived]
+            impl<#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
+            where #wc {
+                fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
+                    use ::nommy::eyre::WrapErr;
+                    #parse_impl
+
+                    Ok(#name (#(
+                        #names,
+                    )*))
+                }
+
+                fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
+                    #peek_impl
+                    true
+                }
+            }
+        })
     }
 }
 
@@ -55,45 +87,6 @@ impl Unnamed {
             args,
             fields,
             generic,
-        })
-    }
-}
-
-impl ToTokens for Unnamed {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let Unnamed {
-            name,
-            args,
-            generic,
-            ..
-        } = self;
-
-        let BuildOutput {
-            peek_impl,
-            parse_impl,
-            wc,
-        } = self.build();
-
-        let names = self.fields.iter().enumerate().map(|(i, f)| f.name(i));
-
-        tokens.extend(quote!{
-            #[automatically_derived]
-            impl<#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
-            where #wc {
-                fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
-                    use ::nommy::eyre::WrapErr;
-                    #parse_impl
-
-                    Ok(#name (#(
-                        #names,
-                    )*))
-                }
-
-                fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
-                    #peek_impl
-                    true
-                }
-            }
         })
     }
 }

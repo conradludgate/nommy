@@ -146,33 +146,33 @@ impl<'a> Builder<'a> {
     }
 }
 
-pub trait FnImpl<F: FieldType>: Sized {
-    const TYPE: &'static str;
-    fn name(&self) -> &syn::Ident;
-    fn fields(&self) -> &[F];
-    fn attrs(&self) -> &GlobalAttr;
-    fn generic(&self) -> &syn::Type;
+pub struct FnImpl<'a, F> {
+    pub ty: &'static str,
+    pub name: &'a syn::Ident,
+    pub fields: &'a [F],
+    pub attrs: &'a GlobalAttr,
+    pub generic: &'a syn::Type,
+}
 
-    fn build(&self) -> BuildOutput {
-        let mut builder = Builder::new(self.generic(), self.name());
-        let attrs = self.attrs();
+impl<'a, F: FieldType> FnImpl<'a, F> {
+    pub fn build(&self) -> BuildOutput {
+        let mut builder = Builder::new(self.generic, self.name);
 
-        builder.create_ignore(&attrs.ignore);
+        builder.create_ignore(&self.attrs.ignore);
         builder.add_fix(
-            &attrs.prefix,
+            &self.attrs.prefix,
             "prefix",
-            format!("{} `{}`", Self::TYPE, self.name()),
+            format!("{} `{}`", self.ty, self.name),
         );
 
-        let fields = self.fields();
-        for (field_num, field) in fields.iter().enumerate() {
+        for (field_num, field) in self.fields.iter().enumerate() {
             builder.add_field(field, field_num)
         }
 
         builder.add_fix(
-            &attrs.suffix,
+            &self.attrs.suffix,
             "suffix",
-            format!("{} `{}`", Self::TYPE, self.name()),
+            format!("{} `{}`", self.ty, self.name),
         );
 
         builder.build()

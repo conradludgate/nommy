@@ -8,23 +8,19 @@ pub struct EnumVariantUnit {
     pub attrs: GlobalAttr,
 }
 
-impl FnImpl<NamedField> for (&EnumVariantUnit, &Enum) {
-    const TYPE: &'static str = "unit variant";
-    fn fields(&self) -> &[NamedField] {
-        &[]
-    }
-    fn name(&self) -> &syn::Ident {
-        &self.0.name
-    }
-    fn generic(&self) -> &syn::Type {
-        &self.1.generic
-    }
-    fn attrs(&self) -> &GlobalAttr {
-        &self.0.attrs
-    }
-}
-
 impl EnumVariantUnit {
+    pub fn fn_impl<'a>(&'a self, enum_: &'a Enum) -> FnImpl<'a, NamedField> {
+        let Self { name, attrs } = self;
+        let fields: &[NamedField] = &[];
+        FnImpl {
+            ty: "unit variant",
+            name,
+            fields,
+            attrs,
+            generic: &enum_.generic,
+        }
+    }
+
     pub fn result(&self, enum_: &Enum) -> TokenStream {
         let enum_name = &enum_.name;
         let variant_name = &self.name;

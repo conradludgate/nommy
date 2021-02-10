@@ -17,19 +17,51 @@ pub struct Named {
     generic: syn::Type,
 }
 
-impl FnImpl<NamedField> for Named {
-    const TYPE: &'static str = "struct";
-    fn fields(&self) -> &[NamedField] {
-        &self.fields
-    }
-    fn name(&self) -> &syn::Ident {
-        &self.name
-    }
-    fn generic(&self) -> &syn::Type {
-        &self.generic
-    }
-    fn attrs(&self) -> &GlobalAttr {
-        &self.attrs
+impl ToTokens for Named {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let Named {
+            name,
+            fields,
+            args,
+            attrs,
+            generic,
+        } = self;
+
+        let fn_impl = FnImpl {
+            ty: "struct",
+            name,
+            fields,
+            attrs,
+            generic,
+        };
+
+        let BuildOutput {
+            peek_impl,
+            parse_impl,
+            wc,
+        } = fn_impl.build();
+
+        let names = self.fields.iter().map(|f| &f.name);
+
+        tokens.extend(quote!{
+            #[automatically_derived]
+            impl<#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
+            where #wc {
+                fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
+                    use ::nommy::eyre::WrapErr;
+                    #parse_impl
+
+                    Ok(#name {#(
+                        #names,
+                    )*})
+                }
+
+                fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
+                    #peek_impl
+                    true
+                }
+            }
+        });
     }
 }
 
@@ -58,58 +90,3 @@ impl Named {
         })
     }
 }
-
-impl ToTokens for Named {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let Named {
-            name,
-            fields: _,
-            args,
-            attrs: _,
-            generic,
-        } = self;
-
-        let BuildOutput {
-            peek_impl,
-            parse_impl,
-            wc,
-        } = self.build();
-
-        let names = self.fields.iter().map(|f| &f.name);
-
-        tokens.extend(quote!{
-            #[automatically_derived]
-            impl<#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
-            where #wc {
-                fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
-                    use ::nommy::eyre::WrapErr;
-                    #parse_impl
-
-                    Ok(#name {#(
-                        #names,
-                    )*})
-                }
-
-                fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
-                    #peek_impl
-                    true
-                }
-            }
-        });
-    }
-}
-//         let impl_args = match (attrs.debug, &attrs.parse_type) {
-//             (_, Some(_)) => quote!{ <#(#args),*> },
-//             (true, None) => quote!{ <#peek_type: Clone + ::std::fmt::Debug, #(#args),*> },
-//             (false, None) => quote!{ <#peek_type, #(#args),*> },
-//         };
-
-//         let debug = match attrs.debug {
-//             true => {
-//                 let struct_name = name.to_string();
-//                 quote!{
-//                     println!("peeking `{}` with input starting with {:?}", #struct_name, input.cursor().collect::<Vec<_>>());
-//                 }
-//             }
-//             _ => quote!{},
-//         };

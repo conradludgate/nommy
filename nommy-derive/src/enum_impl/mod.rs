@@ -12,7 +12,7 @@ use unnamed::EnumVariantUnnamed;
 
 use crate::{
     attr::GlobalAttr,
-    fn_impl::{parse_or, BuildOutput, Builder, FnImpl},
+    fn_impl::{parse_or, BuildOutput, Builder},
 };
 
 pub struct Enum {
@@ -54,7 +54,7 @@ impl ToTokens for Enum {
                 peek_impl,
                 parse_impl,
                 wc,
-            } = map_vars! {v => |n| (n, self).build()};
+            } = map_vars! {v => |n| n.fn_impl(&self).build()};
 
             outer_builder.add_where_raw(wc.clone());
 

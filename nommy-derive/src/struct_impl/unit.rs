@@ -14,19 +14,46 @@ pub struct Unit {
     generic: syn::Type,
 }
 
-impl FnImpl<NamedField> for Unit {
-    const TYPE: &'static str = "struct";
-    fn fields(&self) -> &[NamedField] {
-        &[]
-    }
-    fn name(&self) -> &syn::Ident {
-        &self.name
-    }
-    fn generic(&self) -> &syn::Type {
-        &self.generic
-    }
-    fn attrs(&self) -> &GlobalAttr {
-        &self.attrs
+impl ToTokens for Unit {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        let Unit {
+            name,
+            args,
+            attrs,
+            generic,
+        } = self;
+
+        let fields: &[NamedField] = &[];
+        let fn_impl = FnImpl {
+            ty: "struct",
+            name,
+            fields,
+            attrs,
+            generic,
+        };
+
+        let BuildOutput {
+            peek_impl,
+            parse_impl,
+            wc,
+        } = fn_impl.build();
+
+        tokens.extend(quote!{
+            #[automatically_derived]
+            impl<#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
+            where #wc {
+                fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
+                    use ::nommy::eyre::WrapErr;
+                    #parse_impl
+                    Ok(#name)
+                }
+
+                fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
+                    #peek_impl
+                    true
+                }
+            }
+        })
     }
 }
 
@@ -45,40 +72,6 @@ impl Unit {
             name,
             args,
             generic,
-        })
-    }
-}
-
-impl ToTokens for Unit {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        let Unit {
-            name,
-            args,
-            attrs: _,
-            generic,
-        } = self;
-
-        let BuildOutput {
-            peek_impl,
-            parse_impl,
-            wc,
-        } = self.build();
-
-        tokens.extend(quote!{
-            #[automatically_derived]
-            impl<#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
-            where #wc {
-                fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
-                    use ::nommy::eyre::WrapErr;
-                    #parse_impl
-                    Ok(#name)
-                }
-
-                fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
-                    #peek_impl
-                    true
-                }
-            }
         })
     }
 }

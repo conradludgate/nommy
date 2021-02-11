@@ -43,7 +43,7 @@ impl ToTokens for Enum {
             generic,
         } = self;
 
-        let mut outer_builder = Builder::new(generic, name);
+        let mut outer_builder = Builder::new(generic, name, &attrs.parse_type);
 
         outer_builder.create_ignore(&attrs.ignore);
         outer_builder.add_fix(&attrs.prefix, "prefix", format!("enum `{}`", name));
@@ -54,7 +54,7 @@ impl ToTokens for Enum {
                 peek_impl,
                 parse_impl,
                 wc,
-            } = map_vars! {v => |n| n.fn_impl(&self).build()};
+            } = map_vars! {v => |n| n.fn_impl(&self).build(&name)};
 
             outer_builder.add_where_raw(wc.clone());
 
@@ -65,17 +65,38 @@ impl ToTokens for Enum {
 
             outer_builder.add_variant(&peek_name, &parse_name);
 
+
+
+            let (peek_fn, parse_fn) = match attrs.parse_type {
+                Some(_) => (
+                    quote!{
+                        fn #peek_name(input: &mut impl ::nommy::Buffer<#generic>) -> bool
+                    },
+                    quote!{
+                        fn #parse_name(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self>
+                    },
+                ),
+                None => (
+                    quote!{
+                        fn #peek_name<#generic>(input: &mut impl ::nommy::Buffer<#generic>) -> bool where #wc
+                    },
+                    quote!{
+                        fn #parse_name<#generic>(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> where #wc
+                    },
+                ),
+            };
+
             tokens.extend(quote!{
                 #[automatically_derived]
                 impl<#(#args),*> #name<#(#args),*>
                 {
-                    fn #parse_name<#generic> (input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> where #wc {
+                    #parse_fn {
                         use ::nommy::eyre::WrapErr;
                         #parse_impl
                         #parse_result
                     }
 
-                    fn #peek_name<#generic> (input: &mut impl ::nommy::Buffer<#generic>) -> bool where #wc {
+                    #peek_fn {
                         #peek_impl
 
                         true
@@ -94,10 +115,18 @@ impl ToTokens for Enum {
             wc,
         } = outer_builder.build();
 
+        let impl_line = match attrs.parse_type {
+            Some(_) => quote!{
+                impl<#(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
+            },
+            None => quote!{
+                impl<#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*> where #wc
+            },
+        };
+
         tokens.extend(quote!{
             #[automatically_derived]
-            impl <#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
-            where #wc {
+            #impl_line {
                 fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
                     use ::nommy::eyre::WrapErr;
                     #parse_impl

@@ -19,6 +19,7 @@ pub struct BuildOutput {
 pub struct Builder<'a> {
     generic: &'a syn::Type,
     type_name: &'a syn::Ident,
+    parse_type: &'a Option<syn::Type>,
 
     peek_impl: TokenStream,
     parse_impl: TokenStream,
@@ -27,10 +28,11 @@ pub struct Builder<'a> {
 }
 
 impl<'a> Builder<'a> {
-    pub fn new(generic: &'a syn::Type, type_name: &'a syn::Ident) -> Self {
+    pub fn new(generic: &'a syn::Type, type_name: &'a syn::Ident, parse_type: &'a Option<syn::Type>) -> Self {
         Self {
             generic,
             type_name,
+            parse_type,
             peek_impl: TokenStream::new(),
             parse_impl: TokenStream::new(),
             wc: TokenStream::new(),
@@ -53,7 +55,7 @@ impl<'a> Builder<'a> {
     }
     pub fn create_ignore(&mut self, ignore: &[syn::Type]) {
         let (ignore_impl, after_each) =
-            ignore_impl(&mut self.wc, ignore, self.generic, self.type_name);
+            ignore_impl(&mut self.wc, ignore, self.generic, self.type_name, self.parse_type);
         self.after_each = after_each;
         self.peek_impl.extend(ignore_impl.clone());
         self.parse_impl.extend(ignore_impl);
@@ -124,7 +126,7 @@ impl<'a> Builder<'a> {
 
     pub fn start_variants(&mut self) {
         self.parse_impl.extend(quote! { let result = });
-        self.peek_impl.extend(quote! { if });
+        self.peek_impl.extend(quote! { let mut cursor = input.cursor(); if });
     }
     pub fn add_variant(&mut self, peek_name: &syn::Ident, parse_name: &syn::Ident) {
         self.parse_impl.extend(quote! {
@@ -133,7 +135,7 @@ impl<'a> Builder<'a> {
             } else
         });
         self.peek_impl.extend(quote! {
-            !Self::#peek_name(&mut input.cursor()) &&
+            !Self::#peek_name(&mut cursor) && cursor.reset() &&
         });
     }
     pub fn finish_variants(&mut self, error: String) {
@@ -142,6 +144,8 @@ impl<'a> Builder<'a> {
         });
         self.peek_impl.extend(quote! {
             true { return false; }
+            let pos = cursor.position();
+            input.fast_forward(pos);
         });
     }
 }
@@ -155,8 +159,8 @@ pub struct FnImpl<'a, F> {
 }
 
 impl<'a, F: FieldType> FnImpl<'a, F> {
-    pub fn build(&self) -> BuildOutput {
-        let mut builder = Builder::new(self.generic, self.name);
+    pub fn build(&self, type_name: &syn::Ident) -> BuildOutput {
+        let mut builder = Builder::new(self.generic, type_name, &self.attrs.parse_type);
 
         builder.create_ignore(&self.attrs.ignore);
         builder.add_fix(

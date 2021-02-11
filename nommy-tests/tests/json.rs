@@ -1,19 +1,18 @@
-#![feature(trivial_bounds)]
-
 use nommy::{text::*, *};
 
 #[derive(Debug, PartialEq, Parse)]
 #[nommy(suffix = Tag<",">)]
 #[nommy(ignore = WhiteSpace)]
+#[nommy(parse_type = char)]
 enum JSON {
     #[nommy(prefix = Tag<"null">)]
     Null,
 
     #[nommy(prefix = Tag<"{">, suffix = Tag<"}">)]
-    Object(Vec<Record<JSON>>),
+    Object(Vec<Record>),
 
     #[nommy(prefix = Tag<"[">, suffix = Tag<"]">)]
-    List(#[nommy(inner_parser = JSON)] Vec<JSON>),
+    List(Vec<JSON>),
 
     String(#[nommy(parser = StringParser)] String),
     // Num(f64),
@@ -21,12 +20,13 @@ enum JSON {
 
 #[derive(Debug, PartialEq, Parse)]
 #[nommy(ignore = WhiteSpace)]
-struct Record<T> {
+#[nommy(parse_type = char)]
+struct Record {
     #[nommy(parser = StringParser)]
     #[nommy(suffix = Tag<":">)]
     name: String,
 
-    value: T,
+    value: JSON,
 }
 
 struct StringParser(String);
@@ -46,6 +46,7 @@ impl Parse<char> for StringParser {
                 ('t', true) => output.push('\t'),
                 ('\\', true) => output.push('\\'),
                 (c, true) => return Err(eyre::eyre!("unknown escaped character code \\{}", c)),
+                ('\"', false) => break,
                 ('\\', false) => {
                     escaped = true;
                     continue;
@@ -90,17 +91,8 @@ impl Into<String> for StringParser {
 }
 
 fn main() {
-    // let fake_json = r#"
-    //     {
-    //         "foo": "bar",
-    //         "baz": {
-    //             "hello": [
-    //                 "world",
-    //             ],
-    //         },
-    //     },
-    // "#;
+    let fake_json = r#"{"foo": "bar","baz": {"hello": ["world",],},},"#;
 
-    // let json: JSON = parse(fake_json.chars()).unwrap();
-    // println!("{:?}", json);
+    let json: JSON = parse(fake_json.chars()).unwrap();
+    println!("{:?}", json);
 }

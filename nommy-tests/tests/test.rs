@@ -6,4 +6,5 @@ fn tests() {
     t.pass("tests/enum.rs");
     t.pass("tests/mega.rs");
     t.pass("tests/http.rs");
+    t.pass("tests/json.rs");
 }

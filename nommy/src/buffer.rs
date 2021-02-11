@@ -187,6 +187,12 @@ impl<'a, T, B: Buffer<T>> Cursor<'a, T, B> {
     pub fn position(&self) -> usize {
         self.index
     }
+
+    /// Resets the cursor back to where it started
+    pub fn reset(&mut self) -> bool {
+        self.index = 0;
+        true
+    }
 }
 
 impl<'a, T, B: Buffer<T>> Buffer<T> for Cursor<'a, T, B> {

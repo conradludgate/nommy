@@ -39,14 +39,22 @@ impl ToTokens for Named {
             peek_impl,
             parse_impl,
             wc,
-        } = fn_impl.build();
+        } = fn_impl.build(&name);
 
         let names = self.fields.iter().map(|f| &f.name);
 
+        let impl_line = match attrs.parse_type {
+            Some(_) => quote!{
+                impl<#(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
+            },
+            None => quote!{
+                impl<#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*> where #wc
+            },
+        };
+
         tokens.extend(quote!{
             #[automatically_derived]
-            impl<#generic, #(#args),*> ::nommy::Parse<#generic> for #name<#(#args),*>
-            where #wc {
+            #impl_line {
                 fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
                     use ::nommy::eyre::WrapErr;
                     #parse_impl

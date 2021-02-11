@@ -159,6 +159,7 @@ pub fn ignore_impl(
     ignore: &[syn::Type],
     generic: &syn::Type,
     type_name: &syn::Ident,
+    parse_type: &Option<syn::Type>,
 ) -> (TokenStream, TokenStream) {
     if ignore.is_empty() {
         return (TokenStream::new(), TokenStream::new());
@@ -184,9 +185,19 @@ pub fn ignore_impl(
             }
         });
     }
+
+    let impl_line = match parse_type {
+        Some(_) => quote! {
+            impl ::nommy::Parse<#generic> for __ParseIgnore
+        },
+        None => quote! {
+            impl<#generic> ::nommy::Parse<#generic> for __ParseIgnore where #ignore_wc
+        },
+    };
+
     let ignore_impl = quote! {
         struct __ParseIgnore;
-        impl<#generic> ::nommy::Parse<#generic> for __ParseIgnore where #ignore_wc {
+        #impl_line {
             fn parse(_: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
                 unimplemented!()
             }

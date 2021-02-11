@@ -4,7 +4,7 @@ pub fn contains(ty: &syn::Type, type_name: &syn::Ident) -> bool {
         syn::Type::Group(ty) => contains(&ty.elem, type_name),
         syn::Type::Paren(ty) => contains(&ty.elem, type_name),
         syn::Type::Path(path) => match path.path.get_ident() {
-            Some(ident) => ident.to_string() == type_name.to_string(),
+            Some(ident) => *ident == *type_name,
             None => {
                 for segment in &path.path.segments {
                     match &segment.arguments {

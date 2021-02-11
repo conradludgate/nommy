@@ -119,23 +119,28 @@ impl<'a> Builder<'a> {
     }
 
     pub fn start_variants(&mut self) {
-        self.parse_impl.extend(quote! { let result = });
+        self.parse_impl.extend(quote! {
+            let mut cursor = input.cursor();
+            let result =
+        });
         self.peek_impl
             .extend(quote! { let mut cursor = input.cursor(); if });
     }
     pub fn add_variant(&mut self, peek_name: &syn::Ident, parse_name: &syn::Ident) {
         self.parse_impl.extend(quote! {
-            if Self::#peek_name(&mut input.cursor()) {
-                Self::#parse_name(input).wrap_err("variant peek succeeded but parse failed")
+            if let (true, Ok(result)) = (cursor.reset_internal(), Self::#parse_name(&mut cursor)) {
+                result
             } else
         });
         self.peek_impl.extend(quote! {
-            !Self::#peek_name(&mut cursor) && cursor.reset() &&
+            !Self::#peek_name(&mut cursor) && cursor.reset_internal() &&
         });
     }
     pub fn finish_variants(&mut self, error: String) {
         self.parse_impl.extend(quote! {
-            { Err(::nommy::eyre::eyre!(#error)) }?;
+            { return Err(::nommy::eyre::eyre!(#error)); };
+            let pos = cursor.position();
+            input.fast_forward(pos);
         });
         self.peek_impl.extend(quote! {
             true { return false; }
@@ -285,7 +290,7 @@ impl<'a> Builder<'a> {
                 if <#ty as ::nommy::Parse<#generic>>::peek(&mut cursor) {
                     let pos = cursor.position();
                     if ::std::cfg!(debug_assertions) && pos == 0 {
-                        panic!(format!("ignore type `{}` passed but read 0 elements. Please ensure it reads at least 1 element otherwise it will cause an infinite loop", #ty_string));
+                        panic!("ignore type `{}` passed but read 0 elements. Please ensure it reads at least 1 element otherwise it will cause an infinite loop", #ty_string);
                     }
                     input.fast_forward(pos);
                     return true

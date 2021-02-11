@@ -15,9 +15,10 @@ pub struct LineEnding;
 
 impl Parse<char> for LineEnding {
     fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
-        match Self::peek(input) {
-            true => Ok(Self),
-            false => Err(eyre::eyre!("could not parse line ending")),
+        if Self::peek(input) {
+            Ok(Self)
+        } else {
+            Err(eyre::eyre!("could not parse line ending"))
         }
     }
 
@@ -36,9 +37,10 @@ pub struct Space;
 
 impl Parse<char> for Space {
     fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
-        match Self::peek(input) {
-            true => Ok(Self),
-            false => Err(eyre::eyre!("could not parse space")),
+        if Self::peek(input) {
+            Ok(Self)
+        } else {
+            Err(eyre::eyre!("could not parse space"))
         }
     }
 
@@ -53,9 +55,10 @@ pub struct WhiteSpace;
 
 impl Parse<char> for WhiteSpace {
     fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
-        match Self::peek(input) {
-            true => Ok(Self),
-            false => Err(eyre::eyre!("could not parse whitespace")),
+        if Self::peek(input) {
+            Ok(Self)
+        } else {
+            Err(eyre::eyre!("could not parse whitespace"))
         }
     }
 

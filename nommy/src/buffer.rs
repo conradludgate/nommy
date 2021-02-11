@@ -142,31 +142,6 @@ impl<'a, T, B: Buffer<T>> Cursor<'a, T, B> {
         }
     }
 
-    // /// Drops this cursor and calls [`Buffer::fast_forward`] on the parent buffer
-    // ///
-    // /// ```
-    // /// use nommy::{Buffer, IntoBuf};
-    // /// let mut input = "foobar".chars().into_buf();
-    // /// let mut cursor = input.cursor();
-    // /// assert_eq!(cursor.next(), Some('f'));
-    // /// assert_eq!(cursor.next(), Some('o'));
-    // /// assert_eq!(cursor.next(), Some('o'));
-    // ///
-    // /// // Typically, the next three calls to `next` would repeat
-    // /// // the first three calls because cursors read non-destructively.
-    // /// // However, this method allows to drop the already-read contents
-    // /// cursor.fast_forward_parent();
-    // /// assert_eq!(input.next(), Some('b'));
-    // /// assert_eq!(input.next(), Some('a'));
-    // /// assert_eq!(input.next(), Some('r'));
-    // /// ```
-    // pub fn fast_forward_parent(self) {
-    //     if cfg!(debug_assertions) && self.index == 0 {
-    //         panic!("attempting to fast forward parent, but cursor has not be read from");
-    //     }
-    //     self.buf.fast_forward(self.index)
-    // }
-
     /// Returns how far along the cursor has read beyond it's parent
     ///
     /// ```
@@ -181,15 +156,18 @@ impl<'a, T, B: Buffer<T>> Cursor<'a, T, B> {
     /// assert_eq!(cursor2.next(), Some('o'));
     /// assert_eq!(cursor2.position(), 2);
     ///
-    /// cursor2.fast_forward_parent();
+    /// let pos = cursor2.position()
+    /// cursor.fast_forward(pos);
     /// assert_eq!(cursor.position(), 3);
     /// ```
+    #[must_use]
     pub fn position(&self) -> usize {
         self.index
     }
 
     /// Resets the cursor back to where it started
-    pub fn reset(&mut self) -> bool {
+    /// Returns true for use in pattern matching/short circuit shenanigans
+    pub fn reset_internal(&mut self) -> bool {
         self.index = 0;
         true
     }

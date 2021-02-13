@@ -1,7 +1,6 @@
 use nommy::{text::*, *};
 
 #[derive(Debug, PartialEq, Parse)]
-#[nommy(suffix = Tag<",">)]
 #[nommy(ignore = WhiteSpace)]
 #[nommy(parse_type = char)]
 enum JSON {
@@ -9,10 +8,18 @@ enum JSON {
     Null,
 
     #[nommy(prefix = Tag<"{">, suffix = Tag<"}">)]
-    Object(Vec<Record>),
+    Object(
+        #[nommy(inner_parser = Record)]
+        #[nommy(seperated_by = Tag<",">)]
+        Vec<Record>
+    ),
 
     #[nommy(prefix = Tag<"[">, suffix = Tag<"]">)]
-    List(Vec<JSON>),
+    List(
+        #[nommy(inner_parser = JSON)]
+        #[nommy(seperated_by = Tag<",">)]
+        Vec<JSON>
+    ),
 
     String(#[nommy(parser = StringParser)] String),
     // Num(f64),
@@ -91,8 +98,13 @@ impl Into<String> for StringParser {
 }
 
 fn main() {
-    let fake_json = r#"{"foo": "bar","baz": {"hello": ["world",],},},"#;
+    let json_input = r#"{
+        "foo": "bar",
+        "baz": {
+            "hello": ["world"]
+        }
+    }"#;
 
-    let json: JSON = parse(fake_json.chars()).unwrap();
+    let json: JSON = parse(json_input.chars()).unwrap();
     println!("{:?}", json);
 }

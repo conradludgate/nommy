@@ -234,23 +234,53 @@ impl<'a> Builder<'a> {
 
     fn parser_parse_vec_tokens(&self, name: &syn::Ident, attrs: &VecFieldAttr) -> TokenStream {
         let generic = &self.generic;
-        let after_each = &self.after_each;
 
         let parser: Option<&syn::Type> = (&attrs.parser).into();
         let parser = parser.unwrap();
-        quote! {
-            let mut #name = ::std::vec::Vec::new();
-            loop {
-                let mut cursor = input.cursor();
-                match <#parser as ::nommy::Parse<#generic>>::parse(&mut cursor) {
-                    Ok(p) => #name.push(p.try_into()?),
-                    _ => break,
-                }
-                let pos = cursor.position();
-                input.fast_forward(pos);
 
-                #after_each
-            };
+        let (min, max) = match &attrs.count {
+            Some(count) => (quote! { #count }, quote! { #count }),
+            None => {
+                let min = match &attrs.min {
+                    Some(min) => quote! { #min },
+                    None => quote! { 0 },
+                };
+                let max = match &attrs.max {
+                    Some(max) => quote! { #max },
+                    None => quote! { usize::MAX },
+                };
+                (min, max)
+            }
+        };
+
+        if let Some(sep) = &attrs.seperated_by {
+            match &attrs.trailing {
+                Some(true) => quote! {
+                    let #name = ::nommy::vec::parse_vec_seperated_by_trailing::<#parser, _, #sep, __ParseIgnore, #generic, _>(#max, input)?;
+                    if #name.len() < #min {
+                        return Err(::nommy::eyre::eyre!("could not parse enough for vec"));
+                    }
+                },
+                Some(false) => quote! {
+                    let #name = ::nommy::vec::parse_vec_seperated_by_maybe_trailing::<#parser, _, #sep, __ParseIgnore, #generic, _>(#max, input)?;
+                    if #name.len() < #min {
+                        return Err(::nommy::eyre::eyre!("could not parse enough for vec"));
+                    }
+                },
+                None => quote! {
+                    let #name = ::nommy::vec::parse_vec_seperated_by::<#parser, _, #sep, __ParseIgnore, #generic, _>(#max, input)?;
+                    if #name.len() < #min {
+                        return Err(::nommy::eyre::eyre!("could not parse enough for vec"));
+                    }
+                },
+            }
+        } else {
+            quote! {
+                let #name = ::nommy::vec::parse_vec::<#parser, _, __ParseIgnore, #generic, _>(#max, input)?;
+                if #name.len() < #min {
+                    return Err(::nommy::eyre::eyre!("could not parse enough for vec"));
+                }
+            }
         }
     }
 
@@ -273,9 +303,6 @@ impl<'a> Builder<'a> {
     }
 
     fn ignore_impl(&mut self, ignore: &[syn::Type]) -> (TokenStream, TokenStream) {
-        if ignore.is_empty() {
-            return (TokenStream::new(), TokenStream::new());
-        }
         let generic = &self.generic;
 
         let mut ignore_impl = TokenStream::new();

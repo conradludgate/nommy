@@ -124,6 +124,8 @@ pub struct VecFieldAttr {
     pub min: Option<syn::Expr>,
     pub max: Option<syn::Expr>,
     pub parser: Option<syn::Type>,
+    pub seperated_by: Option<syn::Type>,
+    pub trailing: Option<bool>,
 }
 
 impl VecFieldAttr {
@@ -202,8 +204,42 @@ impl FieldAttr {
             "suffix" => self.suffix = Some(parse_type(ident.span(), tokens)?),
             "parser" => self.parser = Some(parse_type(ident.span(), tokens)?),
             "inner_parser" => self.vec.parser = Some(parse_type(ident.span(), tokens)?),
+            "seperated_by" => self.vec.seperated_by = Some(parse_type(ident.span(), tokens)?),
+            "trailing" => self.parse_trailing(tokens)?,
             _ => return Err(syn::Error::new_spanned(ident, "unknown parameter")),
         }
         Ok(())
+    }
+
+    pub fn parse_trailing(&mut self, mut tokens: proc_macro2::token_stream::IntoIter) -> syn::Result<()> {
+        let span = match tokens.next() {
+            None => return Ok(()),
+            Some(TokenTree::Punct(p)) => {
+                if p.as_char() != '=' {
+                    return Err(syn::Error::new(p.span(), "expected '=' to follow"))
+                }
+                p.span()
+            }
+            Some(other) => return Err(syn::Error::new(other.span(), "expected '=' to follow"))
+        };
+
+        match tokens.next() {
+            Some(TokenTree::Literal(lit)) => {
+                match lit.to_string().as_str() {
+                    "\"yes\"" => self.vec.trailing = Some(true),
+                    "\"no\"" => self.vec.trailing = None,
+                    "\"maybe\"" => self.vec.trailing = Some(false),
+                    _ => return Err(syn::Error::new(lit.span(), "expected \"yes\", \"no\" or \"maybe\" to follow")),
+                }
+            }
+            Some(other) => return Err(syn::Error::new(other.span(), "expected \"yes\", \"no\" or \"maybe\" to follow")),
+            None => return Err(syn::Error::new(span, "expected \"yes\", \"no\" or \"maybe\" to follow")),
+        }
+
+        match tokens.next() {
+            Some(other) => return Err(syn::Error::new(other.span(), "expected no more tokens")),
+            None => Ok(())
+        }
+
     }
 }

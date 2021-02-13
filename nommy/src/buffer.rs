@@ -156,7 +156,7 @@ impl<'a, T, B: Buffer<T>> Cursor<'a, T, B> {
     /// assert_eq!(cursor2.next(), Some('o'));
     /// assert_eq!(cursor2.position(), 2);
     ///
-    /// let pos = cursor2.position()
+    /// let pos = cursor2.position();
     /// cursor.fast_forward(pos);
     /// assert_eq!(cursor.position(), 3);
     /// ```

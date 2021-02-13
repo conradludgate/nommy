@@ -64,6 +64,7 @@ pub use buffer::*;
 pub mod bytes;
 mod impls;
 pub mod text;
+pub mod vec;
 
 use eyre::Context;
 pub use impls::Vec1;

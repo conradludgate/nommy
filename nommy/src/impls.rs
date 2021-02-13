@@ -180,6 +180,17 @@ impl<P: Parse<T>, T, const N: usize> Parse<T> for [P; N] {
     }
 }
 
+/// Parse
+impl<P: Parse<T>, T> Parse<T> for Box<P> {
+    fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self> {
+        Ok(Box::new(P::parse(input)?))
+    }
+
+    fn peek(input: &mut impl Buffer<T>) -> bool {
+        P::peek(input)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

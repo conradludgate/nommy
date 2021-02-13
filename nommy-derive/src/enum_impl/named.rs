@@ -16,6 +16,7 @@ impl EnumVariantNamed {
             attrs,
             fields,
         } = self;
+
         FnImpl {
             ty: "struct variant",
             name,

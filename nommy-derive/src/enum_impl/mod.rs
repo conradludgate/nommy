@@ -92,6 +92,7 @@ impl ToTokens for Enum {
                 {
                     #parse_fn {
                         use ::nommy::eyre::WrapErr;
+                        use ::std::convert::TryInto;
                         #parse_impl
                         #parse_result
                     }
@@ -129,6 +130,7 @@ impl ToTokens for Enum {
             #impl_line {
                 fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
                     use ::nommy::eyre::WrapErr;
+                    use ::std::convert::TryInto;
                     #parse_impl
 
                     Ok(result)
@@ -152,6 +154,8 @@ impl Enum {
         enum_data: syn::DataEnum,
     ) -> syn::Result<Self> {
         let args = generics.type_params().cloned().map(|tp| tp.ident).collect();
+        let attrs = GlobalAttr::parse_attrs(attrs)?;
+        let generic = parse_or(&attrs.parse_type);
 
         let variants = enum_data
             .variants
@@ -159,7 +163,7 @@ impl Enum {
             .map(|v| match v.fields {
                 syn::Fields::Named(named) => Ok(EnumVariant::Named(EnumVariantNamed {
                     name: v.ident,
-                    attrs: GlobalAttr::parse_attrs(v.attrs)?,
+                    attrs: GlobalAttr::parse_attrs(v.attrs)?.extend_with(&attrs),
                     fields: named
                         .named
                         .into_iter()
@@ -168,7 +172,7 @@ impl Enum {
                 })),
                 syn::Fields::Unnamed(unnamed) => Ok(EnumVariant::Unnamed(EnumVariantUnnamed {
                     name: v.ident,
-                    attrs: GlobalAttr::parse_attrs(v.attrs)?,
+                    attrs: GlobalAttr::parse_attrs(v.attrs)?.extend_with(&attrs),
                     fields: unnamed
                         .unnamed
                         .into_iter()
@@ -177,13 +181,10 @@ impl Enum {
                 })),
                 syn::Fields::Unit => Ok(EnumVariant::Unit(EnumVariantUnit {
                     name: v.ident,
-                    attrs: GlobalAttr::parse_attrs(v.attrs)?,
+                    attrs: GlobalAttr::parse_attrs(v.attrs)?.extend_with(&attrs),
                 })),
             })
             .collect::<syn::Result<_>>()?;
-
-        let attrs = GlobalAttr::parse_attrs(attrs)?;
-        let generic = parse_or(&attrs.parse_type);
 
         Ok(Enum {
             name,

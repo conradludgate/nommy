@@ -222,7 +222,7 @@ impl<'a> Builder<'a> {
     fn parser_parse_tokens(&self, name: &syn::Ident, ty: &syn::Type, error: &str) -> TokenStream {
         let generic = &self.generic;
         quote! {
-            let #name = <#ty as ::nommy::Parse<#generic>>::parse(input).wrap_err(#error)?.into();
+            let #name = <#ty as ::nommy::Parse<#generic>>::parse(input).wrap_err(#error)?.try_into()?;
         }
     }
     fn peeker_peek_tokens(&self, ty: &syn::Type) -> TokenStream {
@@ -243,7 +243,7 @@ impl<'a> Builder<'a> {
             loop {
                 let mut cursor = input.cursor();
                 match <#parser as ::nommy::Parse<#generic>>::parse(&mut cursor) {
-                    Ok(p) => #name.push(p.into()),
+                    Ok(p) => #name.push(p.try_into()?),
                     _ => break,
                 }
                 let pos = cursor.position();

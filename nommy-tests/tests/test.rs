@@ -7,4 +7,5 @@ fn tests() {
     t.pass("tests/mega.rs");
     t.pass("tests/http.rs");
     t.pass("tests/json.rs");
+    t.pass("tests/lisp.rs");
 }

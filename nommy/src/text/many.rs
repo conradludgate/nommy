@@ -1,3 +1,5 @@
+use std::{convert::TryFrom, str::FromStr};
+
 use crate::{eyre, Buffer, Parse};
 
 use super::OneOf;
@@ -114,6 +116,13 @@ pub struct AnyOf1<const CHARS: &'static str>(String);
 impl<const CHARS: &'static str> From<AnyOf1<CHARS>> for String {
     fn from(v: AnyOf1<CHARS>) -> Self {
         v.0
+    }
+}
+
+impl<const CHARS: &'static str> TryFrom<AnyOf1<CHARS>> for usize {
+    type Error = <Self as FromStr>::Err;
+    fn try_from(v: AnyOf1<CHARS>) -> Result<Self, Self::Error> {
+        Self::from_str(&v.0)
     }
 }
 

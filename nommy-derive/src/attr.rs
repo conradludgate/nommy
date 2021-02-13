@@ -30,6 +30,12 @@ fn parse_type(
 }
 
 impl GlobalAttr {
+    pub fn extend_with(mut self, extend: &Self) -> Self {
+        self.ignore.extend_from_slice(&extend.ignore);
+        self.parse_type = extend.parse_type.clone();
+        self
+    }
+
     pub fn parse_attrs(attrs: Vec<syn::Attribute>) -> syn::Result<Self> {
         let mut output = GlobalAttr::default();
         for attr in attrs {

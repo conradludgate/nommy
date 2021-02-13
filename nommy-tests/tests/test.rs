@@ -8,4 +8,5 @@ fn tests() {
     t.pass("tests/http.rs");
     t.pass("tests/json.rs");
     t.pass("tests/lisp.rs");
+    t.pass("tests/xml.rs");
 }

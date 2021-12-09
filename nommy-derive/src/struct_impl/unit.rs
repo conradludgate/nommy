@@ -50,14 +50,15 @@ impl ToTokens for Unit {
         tokens.extend(quote!{
             #[automatically_derived]
             #impl_line {
-                fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
+                type Args = ();
+                fn parse(input: &mut impl ::nommy::Buffer<#generic>, _: &()) -> ::nommy::eyre::Result<Self> {
                     use ::nommy::eyre::WrapErr;
                     use ::std::convert::TryInto;
                     #parse_impl
                     Ok(#name)
                 }
 
-                fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
+                fn peek(input: &mut impl ::nommy::Buffer<#generic>, _: &()) -> bool {
                     #peek_impl
                     true
                 }

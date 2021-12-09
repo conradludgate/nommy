@@ -22,12 +22,13 @@ impl<const CHARS: &'static str> From<AnyOf<CHARS>> for String {
 }
 
 impl<const CHARS: &'static str> Parse<char> for AnyOf<CHARS> {
-    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
+    type Args = ();
+    fn parse(input: &mut impl Buffer<char>, args: &()) -> eyre::Result<Self> {
         let mut output = String::new();
 
         loop {
             let mut cursor = input.cursor();
-            match OneOf::<CHARS>::parse(&mut cursor) {
+            match OneOf::<CHARS>::parse(&mut cursor, args) {
                 Ok(c) => output.push(c.into()),
                 Err(_) => break,
             }
@@ -38,10 +39,10 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf<CHARS> {
         Ok(Self(output))
     }
 
-    fn peek(input: &mut impl Buffer<char>) -> bool {
+    fn peek(input: &mut impl Buffer<char>, args: &()) -> bool {
         loop {
             let mut cursor = input.cursor();
-            if !OneOf::<CHARS>::peek(&mut cursor) {
+            if !OneOf::<CHARS>::peek(&mut cursor, args) {
                 break;
             }
             let pos = cursor.position();
@@ -69,10 +70,11 @@ impl<const CHARS: &'static str> From<WhileNot1<CHARS>> for String {
 }
 
 impl<const CHARS: &'static str> Parse<char> for WhileNot1<CHARS> {
-    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
+    type Args = ();
+    fn parse(input: &mut impl Buffer<char>, args: &()) -> eyre::Result<Self> {
         let mut output = String::new();
 
-        while !OneOf::<CHARS>::peek(&mut input.cursor()) {
+        while !OneOf::<CHARS>::peek(&mut input.cursor(), args) {
             match input.next() {
                 None => break,
                 Some(c) => output.push(c),
@@ -86,13 +88,13 @@ impl<const CHARS: &'static str> Parse<char> for WhileNot1<CHARS> {
         }
     }
 
-    fn peek(input: &mut impl Buffer<char>) -> bool {
-        if OneOf::<CHARS>::peek(input) {
+    fn peek(input: &mut impl Buffer<char>, args: &()) -> bool {
+        if OneOf::<CHARS>::peek(input, args) {
             return false;
         }
         loop {
             let mut cursor = input.cursor();
-            if OneOf::<CHARS>::peek(&mut cursor) {
+            if OneOf::<CHARS>::peek(&mut cursor, args) {
                 break;
             }
             let pos = cursor.position();
@@ -127,12 +129,13 @@ impl<const CHARS: &'static str> TryFrom<AnyOf1<CHARS>> for usize {
 }
 
 impl<const CHARS: &'static str> Parse<char> for AnyOf1<CHARS> {
-    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
+    type Args = ();
+    fn parse(input: &mut impl Buffer<char>, args: &()) -> eyre::Result<Self> {
         let mut output = String::new();
 
         loop {
             let mut cursor = input.cursor();
-            match OneOf::<CHARS>::parse(&mut cursor) {
+            match OneOf::<CHARS>::parse(&mut cursor, args) {
                 Ok(c) => output.push(c.into()),
                 Err(_) => break,
             }
@@ -147,13 +150,13 @@ impl<const CHARS: &'static str> Parse<char> for AnyOf1<CHARS> {
         }
     }
 
-    fn peek(input: &mut impl Buffer<char>) -> bool {
-        if !OneOf::<CHARS>::peek(input) {
+    fn peek(input: &mut impl Buffer<char>, args: &()) -> bool {
+        if !OneOf::<CHARS>::peek(input, args) {
             return false;
         }
         loop {
             let mut cursor = input.cursor();
-            if !OneOf::<CHARS>::peek(&mut cursor) {
+            if !OneOf::<CHARS>::peek(&mut cursor, args) {
                 break;
             }
             let pos = cursor.position();
@@ -172,7 +175,7 @@ mod tests {
     fn any_of_peek() {
         let mut buffer = "1024$".chars().into_buf();
         let mut cursor = buffer.cursor();
-        assert!(AnyOf::<"0123456789">::peek(&mut cursor));
+        assert!(AnyOf::<"0123456789">::peek(&mut cursor, &()));
         assert_eq!(cursor.next(), Some('$'));
     }
 }

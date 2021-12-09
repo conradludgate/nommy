@@ -18,7 +18,8 @@ impl<const BYTES: &'static [u8]> From<OneOf<BYTES>> for u8 {
 }
 
 impl<const BYTES: &'static [u8]> Parse<u8> for OneOf<BYTES> {
-    fn parse(input: &mut impl Buffer<u8>) -> eyre::Result<Self> {
+    type Args = ();
+    fn parse(input: &mut impl Buffer<u8>, _: &()) -> eyre::Result<Self> {
         match input.next() {
             Some(c) => {
                 if BYTES.contains(&c) {
@@ -35,7 +36,7 @@ impl<const BYTES: &'static [u8]> Parse<u8> for OneOf<BYTES> {
         }
     }
 
-    fn peek(input: &mut impl Buffer<u8>) -> bool {
+    fn peek(input: &mut impl Buffer<u8>, _: &()) -> bool {
         match input.next() {
             Some(c) => BYTES.contains(&c),
             None => false,

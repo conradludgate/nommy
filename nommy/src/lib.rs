@@ -67,7 +67,6 @@ pub mod text;
 pub mod vec;
 
 use eyre::Context;
-pub use impls::Vec1;
 
 /// Derive Parse for structs or enums
 ///
@@ -137,11 +136,12 @@ pub use eyre;
 pub fn parse<P, I>(iter: I) -> eyre::Result<P>
 where
     P: Parse<<I::Iter as Iterator>::Item>,
+    P::Args: Default,
     I: IntoBuf,
     <I::Iter as Iterator>::Item: Clone,
 {
     let mut buffer = iter.into_buf();
-    P::parse(&mut buffer)
+    P::parse(&mut buffer, &Default::default())
 }
 
 /// `parse_terminated` takes the given iterator, putting it through [`P::parse`](Parse::parse),
@@ -163,11 +163,12 @@ where
 pub fn parse_terminated<P, I>(iter: I) -> eyre::Result<P>
 where
     P: Parse<<I::Iter as Iterator>::Item>,
+    P::Args: Default,
     I: IntoBuf,
     <I::Iter as Iterator>::Item: Clone,
 {
     let mut buffer = iter.into_buf();
-    let output = P::parse(&mut buffer)?;
+    let output = P::parse(&mut buffer, &Default::default())?;
     if buffer.next().is_some() {
         Err(eyre::eyre!("input was not parsed completely"))
     } else {
@@ -186,17 +187,35 @@ where
 /// Tag::<".">::parse(&mut buffer).unwrap();
 /// ```
 pub trait Parse<T>: Sized {
+    /// Extra arguments to provide the parser at runtime
+    type Args;
+
     /// Parse the input buffer, returning Ok if the value could be parsed,
     /// Otherwise, returns a meaningful error
     ///
     /// # Errors
     /// Will return an error if the parser fails to interpret the input at any point
-    fn parse(input: &mut impl Buffer<T>) -> eyre::Result<Self>;
+    fn parse(input: &mut impl Buffer<T>, args: &Self::Args) -> eyre::Result<Self>;
+
+
+    /// Parse the input buffer with default args, returning Ok if the value could be parsed,
+    /// Otherwise, returns a meaningful error
+    ///
+    /// # Errors
+    /// Will return an error if the parser fails to interpret the input at any point
+    fn parse_def(input: &mut impl Buffer<T>) -> eyre::Result<Self> where Self::Args: Default {
+        Self::parse(input, &Default::default())
+    }
 
     /// Peek reads the input buffer, returning true if the value could be found,
     /// Otherwise, returns false.
     /// Not required, but usually provides better performance if implemented
-    fn peek(input: &mut impl Buffer<T>) -> bool {
-        Self::parse(input).is_ok()
+    fn peek(input: &mut impl Buffer<T>, args: &Self::Args) -> bool {
+        Self::parse(input, args).is_ok()
+    }
+
+    /// Same as [`peek`] but uses default args
+    fn peek_def(input: &mut impl Buffer<T>) -> bool where Self::Args: Default {
+        Self::peek(input, &Default::default())
     }
 }

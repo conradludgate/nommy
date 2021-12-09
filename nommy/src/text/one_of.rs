@@ -18,7 +18,8 @@ impl<const CHARS: &'static str> From<OneOf<CHARS>> for char {
 }
 
 impl<const CHARS: &'static str> Parse<char> for OneOf<CHARS> {
-    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
+    type Args = ();
+    fn parse(input: &mut impl Buffer<char>, _: &()) -> eyre::Result<Self> {
         match input.next() {
             Some(c) => {
                 if CHARS.contains(c) {
@@ -35,7 +36,7 @@ impl<const CHARS: &'static str> Parse<char> for OneOf<CHARS> {
         }
     }
 
-    fn peek(input: &mut impl Buffer<char>) -> bool {
+    fn peek(input: &mut impl Buffer<char>, _: &()) -> bool {
         match input.next() {
             Some(c) => CHARS.contains(c),
             None => false,

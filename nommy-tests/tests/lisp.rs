@@ -1,6 +1,6 @@
 use std::{convert::TryFrom, str::FromStr};
 
-use nommy::{text::*, IntoBuf, Parse};
+use nommy::{text::*, Parse, parse};
 
 type Ident = WhileNot1<" \t\r\n)">;
 
@@ -64,8 +64,8 @@ impl Exp {
 }
 
 fn main() -> nommy::eyre::Result<()> {
-    let mut input = "(+ 4 (* 3 5.5))".chars().into_buf();
-    let exp = Exp::parse(&mut input)?;
+    let input = "(+ 4 (* 3 5.5))".chars();
+    let exp: Exp = parse(input)?;
     println!("{:?} == {}", exp, exp.eval());
 
     Ok(())

@@ -9,15 +9,16 @@ type Digits = AnyOf1<"0123456789">;
 pub struct Number(usize);
 impl Parse<char> for Number
 {
-    fn parse(input: &mut impl Buffer<char>) -> nommy::eyre::Result<Self> {
-        let digits = Digits::parse(input)?;
+    type Args = ();
+    fn parse(input: &mut impl Buffer<char>, _: &()) -> nommy::eyre::Result<Self> {
+        let digits = Digits::parse(input, &())?;
         let string: String = digits.into();
         let u = usize::from_str(&string)?;
         Ok(Number(u))
     }
 
-    fn peek(input: &mut impl Buffer<char>) -> bool {
-        Digits::peek(input)
+    fn peek(input: &mut impl Buffer<char>, _: &()) -> bool {
+        Digits::peek(input, &())
     }
 }
 impl Into<usize> for Number {

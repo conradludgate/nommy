@@ -29,6 +29,26 @@ fn parse_type(
     syn::parse2(stream)
 }
 
+fn parse_expr(
+    span: Span,
+    mut tokens: proc_macro2::token_stream::IntoIter,
+) -> syn::Result<syn::Expr> {
+    match tokens.next() {
+        Some(TokenTree::Punct(p)) => {
+            if p.as_char() != '=' {
+                return Err(syn::Error::new_spanned(p, "expected an '=' to follow"));
+            }
+        }
+        Some(t) => return Err(syn::Error::new_spanned(t, "expected an '=' to follow")),
+        None => return Err(syn::Error::new(span, "expected an '=' to follow")),
+    }
+
+    let mut stream = TokenStream::new();
+    stream.extend(tokens);
+
+    syn::parse2(stream)
+}
+
 impl GlobalAttr {
     pub fn extend_with(mut self, extend: &Self) -> Self {
         self.ignore.extend_from_slice(&extend.ignore);
@@ -206,6 +226,8 @@ impl FieldAttr {
             "inner_parser" => self.vec.parser = Some(parse_type(ident.span(), tokens)?),
             "seperated_by" => self.vec.seperated_by = Some(parse_type(ident.span(), tokens)?),
             "trailing" => self.parse_trailing(tokens)?,
+            "min" => self.vec.min = Some(parse_expr(ident.span(), tokens)?),
+            "max" => self.vec.max = Some(parse_expr(ident.span(), tokens)?),
             _ => return Err(syn::Error::new_spanned(ident, "unknown parameter")),
         }
         Ok(())

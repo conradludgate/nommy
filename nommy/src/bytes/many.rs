@@ -20,12 +20,13 @@ impl<const BYTES: &'static [u8]> From<AnyOf1<BYTES>> for Vec<u8> {
 }
 
 impl<const BYTES: &'static [u8]> Parse<u8> for AnyOf1<BYTES> {
-    fn parse(input: &mut impl Buffer<u8>) -> eyre::Result<Self> {
+    type Args = ();
+    fn parse(input: &mut impl Buffer<u8>, args: &()) -> eyre::Result<Self> {
         let mut output = Vec::new();
 
-        while OneOf::<BYTES>::peek(&mut input.cursor()) {
+        while OneOf::<BYTES>::peek(&mut input.cursor(), args) {
             output.push(
-                OneOf::<BYTES>::parse(input)
+                OneOf::<BYTES>::parse(input, args)
                     .expect("peek succeeded but parse failed")
                     .into(),
             );
@@ -38,13 +39,13 @@ impl<const BYTES: &'static [u8]> Parse<u8> for AnyOf1<BYTES> {
         }
     }
 
-    fn peek(input: &mut impl Buffer<u8>) -> bool {
-        if !OneOf::<BYTES>::peek(input) {
+    fn peek(input: &mut impl Buffer<u8>, args: &()) -> bool {
+        if !OneOf::<BYTES>::peek(input, args) {
             return false;
         }
         loop {
             let mut cursor = input.cursor();
-            if !OneOf::<BYTES>::peek(&mut cursor) {
+            if !OneOf::<BYTES>::peek(&mut cursor, args) {
                 break;
             }
             let pos = cursor.position();

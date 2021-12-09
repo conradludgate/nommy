@@ -14,15 +14,16 @@ use crate::{eyre, Buffer, Parse};
 pub struct LineEnding;
 
 impl Parse<char> for LineEnding {
-    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
-        if Self::peek(input) {
+    type Args = ();
+    fn parse(input: &mut impl Buffer<char>, args: &()) -> eyre::Result<Self> {
+        if Self::peek(input, args) {
             Ok(Self)
         } else {
             Err(eyre::eyre!("could not parse line ending"))
         }
     }
 
-    fn peek(input: &mut impl Buffer<char>) -> bool {
+    fn peek(input: &mut impl Buffer<char>, _: &()) -> bool {
         match input.next() {
             Some('\n') => true,
             Some('\r') => input.next() == Some('\n'),
@@ -36,15 +37,16 @@ impl Parse<char> for LineEnding {
 pub struct Space;
 
 impl Parse<char> for Space {
-    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
-        if Self::peek(input) {
+    type Args = ();
+    fn parse(input: &mut impl Buffer<char>, args: &()) -> eyre::Result<Self> {
+        if Self::peek(input, args) {
             Ok(Self)
         } else {
             Err(eyre::eyre!("could not parse space"))
         }
     }
 
-    fn peek(input: &mut impl Buffer<char>) -> bool {
+    fn peek(input: &mut impl Buffer<char>, _: &()) -> bool {
         matches!(input.next(), Some(' ') | Some('\t'))
     }
 }
@@ -54,15 +56,16 @@ impl Parse<char> for Space {
 pub struct WhiteSpace;
 
 impl Parse<char> for WhiteSpace {
-    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
-        if Self::peek(input) {
+    type Args = ();
+    fn parse(input: &mut impl Buffer<char>, args: &()) -> eyre::Result<Self> {
+        if Self::peek(input, args) {
             Ok(Self)
         } else {
             Err(eyre::eyre!("could not parse whitespace"))
         }
     }
 
-    fn peek(input: &mut impl Buffer<char>) -> bool {
+    fn peek(input: &mut impl Buffer<char>, _: &()) -> bool {
         match input.next() {
             Some(' ') | Some('\t') | Some('\n') => true,
             Some('\r') => input.next() == Some('\n'),
@@ -79,7 +82,7 @@ mod tests {
     #[test]
     fn parse_spaces() {
         let mut input = " \t \t   \t\t  \t.".chars().into_buf();
-        let output = Vec::<Space>::parse(&mut input).unwrap();
+        let output = Vec::<Space>::parse_def(&mut input).unwrap();
         assert_eq!(output.len(), 12);
         assert_eq!(input.next(), Some('.'));
     }
@@ -87,7 +90,7 @@ mod tests {
     fn peek_spaces() {
         let mut input = " \t \t   \t\t  \t.".chars().into_buf();
         let mut cursor = input.cursor();
-        assert!(Vec::<Space>::peek(&mut cursor));
+        assert!(Vec::<Space>::peek_def(&mut cursor));
         assert_eq!(cursor.next(), Some('.'));
     }
 
@@ -95,9 +98,9 @@ mod tests {
     fn parse_newline() {
         let mut input = "\n.\r\n.".chars().into_buf();
 
-        let _ = LineEnding::parse(&mut input).unwrap();
+        let _ = LineEnding::parse(&mut input, &()).unwrap();
         assert_eq!(input.next(), Some('.'));
-        let _ = LineEnding::parse(&mut input).unwrap();
+        let _ = LineEnding::parse(&mut input, &()).unwrap();
         assert_eq!(input.next(), Some('.'));
     }
 }

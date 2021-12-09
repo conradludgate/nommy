@@ -22,7 +22,8 @@ struct XML {
 #[nommy(parse_type = char)]
 enum Children {
     #[nommy(prefix = Tag<ENDING_TAG1>, suffix = Tag<"<">)]
-    Some(Vec1<XML>),
+    #[nommy(min = 1)]
+    Some(Vec<XML>),
     None,
 }
 

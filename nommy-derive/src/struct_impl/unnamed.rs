@@ -55,7 +55,8 @@ impl ToTokens for Unnamed {
         tokens.extend(quote!{
             #[automatically_derived]
             #impl_line {
-                fn parse(input: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
+                type Args = ();
+                fn parse(input: &mut impl ::nommy::Buffer<#generic>, _: &()) -> ::nommy::eyre::Result<Self> {
                     use ::nommy::eyre::WrapErr;
                     use ::std::convert::TryInto;
                     #parse_impl
@@ -65,7 +66,7 @@ impl ToTokens for Unnamed {
                     )*))
                 }
 
-                fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
+                fn peek(input: &mut impl ::nommy::Buffer<#generic>, _: &()) -> bool {
                     #peek_impl
                     true
                 }

@@ -12,7 +12,8 @@ use crate::{eyre, Buffer, Parse};
 pub struct Tag<const TAG: &'static [u8]>;
 
 impl<const TAG: &'static [u8]> Parse<u8> for Tag<TAG> {
-    fn parse(input: &mut impl Buffer<u8>) -> eyre::Result<Self> {
+    type Args = ();
+    fn parse(input: &mut impl Buffer<u8>, _: &()) -> eyre::Result<Self> {
         let b: Vec<u8> = input.take(TAG.len()).collect();
         if TAG == b {
             Ok(Self)
@@ -21,7 +22,7 @@ impl<const TAG: &'static [u8]> Parse<u8> for Tag<TAG> {
         }
     }
 
-    fn peek(input: &mut impl Buffer<u8>) -> bool {
+    fn peek(input: &mut impl Buffer<u8>, _: &()) -> bool {
         TAG.iter().cloned().eq(input.take(TAG.len()))
     }
 }
@@ -34,14 +35,14 @@ mod tests {
     #[test]
     fn test_parse_matches() {
         let mut input = "(){}[]<>".bytes().into_buf();
-        Tag::<b"(">::parse(&mut input).unwrap();
-        Tag::<b")">::parse(&mut input).unwrap();
-        Tag::<b"{">::parse(&mut input).unwrap();
-        Tag::<b"}">::parse(&mut input).unwrap();
-        Tag::<b"[">::parse(&mut input).unwrap();
-        Tag::<b"]">::parse(&mut input).unwrap();
-        Tag::<b"<">::parse(&mut input).unwrap();
-        Tag::<b">">::parse(&mut input).unwrap();
+        Tag::<b"(">::parse(&mut input, &()).unwrap();
+        Tag::<b")">::parse(&mut input, &()).unwrap();
+        Tag::<b"{">::parse(&mut input, &()).unwrap();
+        Tag::<b"}">::parse(&mut input, &()).unwrap();
+        Tag::<b"[">::parse(&mut input, &()).unwrap();
+        Tag::<b"]">::parse(&mut input, &()).unwrap();
+        Tag::<b"<">::parse(&mut input, &()).unwrap();
+        Tag::<b">">::parse(&mut input, &()).unwrap();
         assert!(input.next().is_none())
     }
 

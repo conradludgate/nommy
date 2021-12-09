@@ -60,6 +60,7 @@ impl<'a> Builder<'a> {
         self.after_each = after_each;
         self.peek_impl.extend(ignore_impl.clone());
         self.parse_impl.extend(ignore_impl);
+        self.ignore();
     }
 
     pub fn ignore(&mut self) {
@@ -210,25 +211,28 @@ impl<'a> Builder<'a> {
             quote! {}
         } else {
             let generic = &self.generic;
-            quote! {#ty: ::nommy::Parse<#generic>,}
+            dbg!{quote! {
+                #ty: ::nommy::Parse<#generic>,
+                <#ty as ::nommy::Parse<#generic>>::Args: ::std::default::Default,
+            }}
         }
     }
     fn parser_peek_tokens(&self, ty: &syn::Type, error: &str) -> TokenStream {
         let generic = &self.generic;
         quote! {
-            if !(<#ty as ::nommy::Parse<#generic>>::peek(input)) { return Err(::nommy::eyre::eyre!(#error)) }
+            if !(<#ty as ::nommy::Parse<#generic>>::peek(input, &Default::default())) { return Err(::nommy::eyre::eyre!(#error)) }
         }
     }
     fn parser_parse_tokens(&self, name: &syn::Ident, ty: &syn::Type, error: &str) -> TokenStream {
         let generic = &self.generic;
         quote! {
-            let #name = <#ty as ::nommy::Parse<#generic>>::parse(input).wrap_err(#error)?.try_into()?;
+            let #name = <#ty as ::nommy::Parse<#generic>>::parse(input, &Default::default()).wrap_err(#error)?.try_into()?;
         }
     }
     fn peeker_peek_tokens(&self, ty: &syn::Type) -> TokenStream {
         let generic = &self.generic;
         quote! {
-            if !(<#ty as ::nommy::Parse<#generic>>::peek(input)) { return false }
+            if !(<#ty as ::nommy::Parse<#generic>>::peek(input, &Default::default())) { return false }
         }
     }
 
@@ -238,48 +242,66 @@ impl<'a> Builder<'a> {
         let parser: Option<&syn::Type> = (&attrs.parser).into();
         let parser = parser.unwrap();
 
-        let (min, max) = match &attrs.count {
-            Some(count) => (quote! { #count }, quote! { #count }),
+        let args = match &attrs.count {
+            Some(count) => quote! {
+                ::nommy::vec::VecArgs{
+                    min: #count,
+                    max: Some(#count),
+                    ..::std::default::Default::default()
+                }
+            },
             None => {
-                let min = match &attrs.min {
-                    Some(min) => quote! { #min },
-                    None => quote! { 0 },
-                };
-                let max = match &attrs.max {
-                    Some(max) => quote! { #max },
-                    None => quote! { usize::MAX },
-                };
-                (min, max)
+                match (&attrs.min, &attrs.max) {
+                    (Some(min), Some(max)) => quote! {
+                        ::nommy::vec::VecArgs{
+                            min: #min,
+                            max: Some(#max),
+                            ..::std::default::Default::default()
+                        }
+                    },
+                    (None, Some(max)) => quote! {
+                        ::nommy::vec::VecArgs{
+                            max: Some(#max),
+                            ..::std::default::Default::default()
+                        }
+                    },
+                    (Some(min), None) => quote! {
+                        ::nommy::vec::VecArgs{
+                            min: #min,
+                            ..::std::default::Default::default()
+                        }
+                    },
+                    (None, None) => quote! {
+                        ::nommy::vec::VecArgs{
+                            ..::std::default::Default::default()
+                        }
+                    },
+                }
             }
         };
 
         if let Some(sep) = &attrs.seperated_by {
             match &attrs.trailing {
-                Some(true) => quote! {
-                    let #name = ::nommy::vec::parse_vec_seperated_by_trailing::<#parser, _, #sep, __ParseIgnore, #generic, _>(#max, input)?;
-                    if #name.len() < #min {
-                        return Err(::nommy::eyre::eyre!("could not parse enough for vec"));
-                    }
-                },
-                Some(false) => quote! {
-                    let #name = ::nommy::vec::parse_vec_seperated_by_maybe_trailing::<#parser, _, #sep, __ParseIgnore, #generic, _>(#max, input)?;
-                    if #name.len() < #min {
-                        return Err(::nommy::eyre::eyre!("could not parse enough for vec"));
-                    }
-                },
+                // Some(true) => quote! {
+                //     let #name = ::nommy::vec::parse_vec_seperated_by_trailing::<#parser, _, #sep, __ParseIgnore, #generic, _>(#max, input)?;
+                //     if #name.len() < #min {
+                //         return Err(::nommy::eyre::eyre!("could not parse enough for vec"));
+                //     }
+                // },
+                // Some(false) => quote! {
+                //     let #name = ::nommy::vec::parse_vec_seperated_by_maybe_trailing::<#parser, _, #sep, __ParseIgnore, #generic, _>(#max, input)?;
+                //     if #name.len() < #min {
+                //         return Err(::nommy::eyre::eyre!("could not parse enough for vec"));
+                //     }
+                // },
                 None => quote! {
-                    let #name = ::nommy::vec::parse_vec_seperated_by::<#parser, _, #sep, __ParseIgnore, #generic, _>(#max, input)?;
-                    if #name.len() < #min {
-                        return Err(::nommy::eyre::eyre!("could not parse enough for vec"));
-                    }
+                    let #name = <::nommy::vec::VecSeperated::<#parser, _, #sep> as ::nommy::Parse<#generic>>::parse(input, #args)?;
                 },
+                _ => unimplemented!(),
             }
         } else {
             quote! {
-                let #name = ::nommy::vec::parse_vec::<#parser, _, __ParseIgnore, #generic, _>(#max, input)?;
-                if #name.len() < #min {
-                    return Err(::nommy::eyre::eyre!("could not parse enough for vec"));
-                }
+                let #name = <::std::vec::Vec::<#parser> as ::nommy::Parse<#generic>>::parse(input, #args)?;
             }
         }
     }
@@ -314,7 +336,7 @@ impl<'a> Builder<'a> {
             ignore_impl.extend(quote! {
             {
                 let mut cursor = input.cursor();
-                if <#ty as ::nommy::Parse<#generic>>::peek(&mut cursor) {
+                if <#ty as ::nommy::Parse<#generic>>::peek(&mut cursor, &Default::default()) {
                     let pos = cursor.position();
                     if ::std::cfg!(debug_assertions) && pos == 0 {
                         panic!("ignore type `{}` passed but read 0 elements. Please ensure it reads at least 1 element otherwise it will cause an infinite loop", #ty_string);
@@ -338,10 +360,11 @@ impl<'a> Builder<'a> {
         let ignore_impl = quote! {
             struct __ParseIgnore;
             #impl_line {
-                fn parse(_: &mut impl ::nommy::Buffer<#generic>) -> ::nommy::eyre::Result<Self> {
+                type Args = ();
+                fn parse(_: &mut impl ::nommy::Buffer<#generic>, _: &()) -> ::nommy::eyre::Result<Self> {
                     unimplemented!()
                 }
-                fn peek(input: &mut impl ::nommy::Buffer<#generic>) -> bool {
+                fn peek(input: &mut impl ::nommy::Buffer<#generic>, _: &()) -> bool {
                     #ignore_impl
 
                     false
@@ -350,7 +373,7 @@ impl<'a> Builder<'a> {
         };
 
         let after_each = quote! {
-            <::std::vec::Vec<__ParseIgnore> as ::nommy::Parse<#generic>>::peek(input);
+            <::std::vec::Vec<__ParseIgnore> as ::nommy::Parse<#generic>>::peek(input, &Default::default());
         };
 
         (ignore_impl, after_each)

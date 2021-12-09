@@ -14,7 +14,8 @@ use crate::{eyre, Buffer, Parse};
 pub struct Tag<const TAG: &'static str>;
 
 impl<const TAG: &'static str> Parse<char> for Tag<TAG> {
-    fn parse(input: &mut impl Buffer<char>) -> eyre::Result<Self> {
+    type Args = ();
+    fn parse(input: &mut impl Buffer<char>, _: &()) -> eyre::Result<Self> {
         let s = String::from_iter(input.take(TAG.len()));
         if TAG == s {
             Ok(Self)
@@ -23,7 +24,7 @@ impl<const TAG: &'static str> Parse<char> for Tag<TAG> {
         }
     }
 
-    fn peek(input: &mut impl Buffer<char>) -> bool {
+    fn peek(input: &mut impl Buffer<char>, _: &()) -> bool {
         TAG.chars().eq(input.take(TAG.len()))
     }
 }
@@ -36,14 +37,14 @@ mod tests {
     #[test]
     fn test_parse_matches() {
         let mut input = "(){}[]<>".chars().into_buf();
-        Tag::<"(">::parse(&mut input).unwrap();
-        Tag::<")">::parse(&mut input).unwrap();
-        Tag::<"{">::parse(&mut input).unwrap();
-        Tag::<"}">::parse(&mut input).unwrap();
-        Tag::<"[">::parse(&mut input).unwrap();
-        Tag::<"]">::parse(&mut input).unwrap();
-        Tag::<"<">::parse(&mut input).unwrap();
-        Tag::<">">::parse(&mut input).unwrap();
+        Tag::<"(">::parse(&mut input, &()).unwrap();
+        Tag::<")">::parse(&mut input, &()).unwrap();
+        Tag::<"{">::parse(&mut input, &()).unwrap();
+        Tag::<"}">::parse(&mut input, &()).unwrap();
+        Tag::<"[">::parse(&mut input, &()).unwrap();
+        Tag::<"]">::parse(&mut input, &()).unwrap();
+        Tag::<"<">::parse(&mut input, &()).unwrap();
+        Tag::<">">::parse(&mut input, &()).unwrap();
         assert!(input.next().is_none())
     }
 
@@ -51,14 +52,14 @@ mod tests {
     fn test_peek_matches() {
         let mut input = "(){}[]<>".chars().into_buf();
         let mut cursor = input.cursor();
-        assert!(Tag::<"(">::peek(&mut cursor));
-        assert!(Tag::<")">::peek(&mut cursor));
-        assert!(Tag::<"{">::peek(&mut cursor));
-        assert!(Tag::<"}">::peek(&mut cursor));
-        assert!(Tag::<"[">::peek(&mut cursor));
-        assert!(Tag::<"]">::peek(&mut cursor));
-        assert!(Tag::<"<">::peek(&mut cursor));
-        assert!(Tag::<">">::peek(&mut cursor));
+        assert!(Tag::<"(">::peek(&mut cursor, &()));
+        assert!(Tag::<")">::peek(&mut cursor, &()));
+        assert!(Tag::<"{">::peek(&mut cursor, &()));
+        assert!(Tag::<"}">::peek(&mut cursor, &()));
+        assert!(Tag::<"[">::peek(&mut cursor, &()));
+        assert!(Tag::<"]">::peek(&mut cursor, &()));
+        assert!(Tag::<"<">::peek(&mut cursor, &()));
+        assert!(Tag::<">">::peek(&mut cursor, &()));
         assert!(cursor.next().is_none())
     }
 
